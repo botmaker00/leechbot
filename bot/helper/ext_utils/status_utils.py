@@ -233,26 +233,26 @@ async def get_readable_message(sid, is_user, page_no=1, status="All", page_step=
             else:
                 subsize = ""
                 count = ""
-            msg += f"\n<b>Processed:</b> {task.processed_bytes()}{subsize}"
+            msg += f"\n<b><i>Pʀᴏᴄᴇssᴇᴅ:</i></b> {task.processed_bytes()}{subsize}"
             if count:
-                msg += f"\n<b>Count:</b> {count}"
-            msg += f"\n<b>Size:</b> {task.size()}"
-            msg += f"\n<b>Speed:</b> {task.speed()}"
-            msg += f"\n<b>Estimated:</b> {task.eta()}"
+                msg += f"\n<b><i>Cᴏᴜɴᴛ:</i></b> {count}"
+            msg += f"\n<b><i>Sɪᴢᴇ:</i></b> {task.size()}"
+            msg += f"\n<b><i>Sᴘᴇᴇᴅ:</i></b> {task.speed()}"
+            msg += f"\n<b><i>Esᴛɪᴍᴀᴛᴇᴅ:</i></b> {task.eta()}"
             if (
                 tstatus == MirrorStatus.STATUS_DOWNLOAD and task.listener.is_torrent
             ) or task.listener.is_qbit:
                 with contextlib.suppress(Exception):
-                    msg += f"\n<b>Seeders:</b> {task.seeders_num()} | <b>Leechers:</b> {task.leechers_num()}"
+                    msg += f"\n<b><i>Sᴇᴇᴅᴇʀs:</i></b> {task.seeders_num()} | <b><i>Lᴇᴇᴄʜᴇʀs:</i></b> {task.leechers_num()}"
         elif tstatus == MirrorStatus.STATUS_SEED:
-            msg += f"\n<b>Size: </b>{task.size()}"
-            msg += f"\n<b>Speed: </b>{task.seed_speed()}"
-            msg += f"\n<b>Uploaded: </b>{task.uploaded_bytes()}"
-            msg += f"\n<b>Ratio: </b>{task.ratio()}"
-            msg += f" | <b>Time: </b>{task.seeding_time()}"
+            msg += f"\n<b><i>Sɪᴢᴇ: </i></b>{task.size()}"
+            msg += f"\n<b><i>Sᴘᴇᴇᴅ: </i></b>{task.seed_speed()}"
+            msg += f"\n<b><i>Uᴘʟᴏᴀᴅᴇᴅ: </i></b>{task.uploaded_bytes()}"
+            msg += f"\n<b><i>Rᴀᴛɪᴏ: </i></b>{task.ratio()}"
+            msg += f" | <b><i>Tɪᴍᴇ: </i></b>{task.seeding_time()}"
         else:
-            msg += f"\n<b>Size: </b>{task.size()}"
-        msg += f"\n<b>Tool:</b> {task.tool}"
+            msg += f"\n<b><i>Sɪᴢᴇ: </i></b>{task.size()}"
+        msg += f"\n<b><i>Tᴏᴏʟ:</i></b> {task.tool}"
         task_gid = task.gid()
         short_gid = task_gid[-8:] if task_gid.startswith("SABnzbd") else task_gid[:8]
         msg += f"\n/stop_{short_gid}\n\n"
@@ -260,22 +260,22 @@ async def get_readable_message(sid, is_user, page_no=1, status="All", page_step=
     if len(msg) == 0:
         if status == "All":
             return None, None
-        msg = f"No Active {status} Tasks!\n\n"
+        msg = f"<blockquote><i>Nᴏ Aᴄᴛɪᴠᴇ {status} Tᴀsᴋs!</i><blockquote>\n\n"
     buttons = ButtonMaker()
     if not is_user:
-        buttons.data_button("≈", f"status {sid} ov", position="header")
+        buttons.data_button("≈", f"sᴛᴀᴛᴜs {sid} ov", position="header")
     if len(tasks) > STATUS_LIMIT:
-        msg += f"<b>Page:</b> {page_no}/{pages} | <b>Tasks:</b> {tasks_no} | <b>Step:</b> {page_step}\n"
-        buttons.data_button("prev", f"status {sid} pre", position="header")
-        buttons.data_button("next", f"status {sid} nex", position="header")
+        msg += f"<b>Pᴀɢᴇ:</b> {page_no}/{pages} | <b>Tᴀsᴋs:</b> {tasks_no} | <b>Sᴛᴇᴘ:</b> {page_step}\n"
+        buttons.data_button("prev", f"sᴛᴀᴛᴜs {sid} pre", position="header")
+        buttons.data_button("next", f"sᴛᴀᴛᴜs {sid} nex", position="header")
         if tasks_no > 30:
             for i in [1, 2, 4, 6, 8, 10, 15]:
-                buttons.data_button(i, f"status {sid} ps {i}", position="footer")
+                buttons.data_button(i, f"sᴛᴀᴛᴜs {sid} ps {i}", position="footer")
     if status != "All" or tasks_no > 20:
         for label, status_value in list(STATUSES.items()):
             if status_value != status:
-                buttons.data_button(label, f"status {sid} st {status_value}")
+                buttons.data_button(label, f"sᴛᴀᴛᴜs {sid} st {status_value}")
     button = buttons.build_menu(8)
-    msg += f"<b>CPU:</b> {cpu_percent()}% | <b>FREE:</b> {get_readable_file_size(disk_usage(DOWNLOAD_DIR).free)}"
-    msg += f"\n<b>RAM:</b> {virtual_memory().percent}% | <b>UPTIME:</b> {get_readable_time(time() - bot_start_time)}"
+    msg += f"<b><i>ᴄᴘᴜ:</i></b> {cpu_percent()}% | <b><i>ғʀᴇᴇ:</i></b> {get_readable_file_size(disk_usage(DOWNLOAD_DIR).free)}"
+    msg += f"\n<b><i>ʀᴀᴍ:</i></b> {virtual_memory().percent}% | <b><i>ᴜᴘᴛɪᴍᴇ:<i></b> {get_readable_time(time() - bot_start_time)}"
     return msg, button
