@@ -45,6 +45,7 @@ leech_options = [
 rclone_options = ["RCLONE_CONFIG", "RCLONE_PATH", "RCLONE_FLAGS"]
 gdrive_options = ["TOKEN_PICKLE", "GDRIVE_ID", "INDEX_URL"]
 
+
 async def get_user_settings(from_user, stype="main"):
     user_id = from_user.id
     name = from_user.mention
