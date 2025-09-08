@@ -106,7 +106,7 @@ if DATABASE_URL:
 UPSTREAM_REPO = (
     config_file.get("UPSTREAM_REPO", "")
     or os.getenv("UPSTREAM_REPO", "")
-    or "https://github.com/AeonOrg/Aeon-MLTB"
+    or "https://github.com/botmaker00/leechbot"
 )
 
 UPSTREAM_BRANCH = (
