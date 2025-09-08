@@ -1,15 +1,15 @@
 # REQUIRED CONFIG
-BOT_TOKEN = ""
-OWNER_ID = 0
-TELEGRAM_API = 0
-TELEGRAM_HASH = ""
+BOT_TOKEN = "6660202383:AAEBs1mFeOLTOxzD3Vt5f6jAASNHM9bShNo"
+OWNER_ID = 5741918628
+TELEGRAM_API = 24929716
+TELEGRAM_HASH = "710a123b921c635952fe5347a09ecccb"
 
 # Recommended for persisting settings, RSS feeds, and task history. Essential for some features.
-DATABASE_URL = ""
+DATABASE_URL = "mongodb+srv://leechbot2:leechbot2@leechbot2.6tvagnq.mongodb.net/?retryWrites=true&w=majority&appName=leechbot2"
 
 # OPTIONAL CONFIG
 TG_PROXY = {}  # Example: {"scheme": "socks5", "hostname": "11.22.33.44", "port": 1234, "username": "user", "password": "pass"}
-USER_SESSION_STRING = ""
+USER_SESSION_STRING = "BQF8ZbQAlUfvksjeHtzlGlnvOalnMvlrBlA2mSjx7aEsvIKk5LKIptik3E67TffchbfLN2iZA_VGmtv4cqGi-xl3rcBK7a58ekChk6s_pGJKMkRR1H_wvM5dcmd-oSaHi6ObSFLyte-totUveM67xveSxXjeUdZJboUv42xlvIm8CB3ULjB2DEYNDgmAvMvOi7gTXqXwNPwfrlcNZgF9yOt_rDRWt0VEXLwQK0rTvMbwFNnYFoVT8-86ZIJqxW9G35gx4EJTBiBRChGjx6EUkx2LAKWQqzPRs7gtz7uOnd7dhpUF3A-0ZTTLC3bnranoiHGhegRGFbrYI-Ga8FG2WTjPvYuhjAAAAAHKkJMCAA"
 CMD_SUFFIX = ""  # Suffix to add to all bot commands
 AUTHORIZED_CHATS = ""  # Space separated chat_id/user_id to authorize
 SUDO_USERS = ""  # Space separated user_id for sudo access
