@@ -219,7 +219,7 @@ async def get_readable_message(sid, is_user, page_no=1, status="All", page_step=
         msg += f"<code>{escape(f'{task.name()}')}</code>"
         if task.listener.subname:
             msg += f"\n<i>{task.listener.subname}</i>"
-        msg += f"\nby: {source(task.listener)}"
+        msg += f"\n⛩️by: {source(task.listener)}"
         if (
             tstatus not in [MirrorStatus.STATUS_SEED, MirrorStatus.STATUS_QUEUEUP]
             and task.listener.progress
@@ -233,26 +233,26 @@ async def get_readable_message(sid, is_user, page_no=1, status="All", page_step=
             else:
                 subsize = ""
                 count = ""
-            msg += f"\n<b><i>Pʀᴏᴄᴇssᴇᴅ:</i></b> {task.processed_bytes()}{subsize}"
+            msg += f"\n<b><i>⚡Pʀᴏᴄᴇssᴇᴅ:</i></b> {task.processed_bytes()}{subsize}"
             if count:
-                msg += f"\n<b><i>Cᴏᴜɴᴛ:</i></b> {count}"
-            msg += f"\n<b><i>Sɪᴢᴇ:</i></b> {task.size()}"
-            msg += f"\n<b><i>Sᴘᴇᴇᴅ:</i></b> {task.speed()}"
-            msg += f"\n<b><i>Esᴛɪᴍᴀᴛᴇᴅ:</i></b> {task.eta()}"
+                msg += f"\n<b><i>💢Cᴏᴜɴᴛ:</i></b> {count}"
+            msg += f"\n<b><i>💥Sɪᴢᴇ:</i></b> {task.size()}"
+            msg += f"\n<b><i>🚀Sᴘᴇᴇᴅ:</i></b> {task.speed()}"
+            msg += f"\n<b><i>✨Esᴛɪᴍᴀᴛᴇᴅ:</i></b> {task.eta()}"
             if (
                 tstatus == MirrorStatus.STATUS_DOWNLOAD and task.listener.is_torrent
             ) or task.listener.is_qbit:
                 with contextlib.suppress(Exception):
                     msg += f"\n<b><i>Sᴇᴇᴅᴇʀs:</i></b> {task.seeders_num()} | <b><i>Lᴇᴇᴄʜᴇʀs:</i></b> {task.leechers_num()}"
         elif tstatus == MirrorStatus.STATUS_SEED:
-            msg += f"\n<b><i>Sɪᴢᴇ: </i></b>{task.size()}"
-            msg += f"\n<b><i>Sᴘᴇᴇᴅ: </i></b>{task.seed_speed()}"
-            msg += f"\n<b><i>Uᴘʟᴏᴀᴅᴇᴅ: </i></b>{task.uploaded_bytes()}"
-            msg += f"\n<b><i>Rᴀᴛɪᴏ: </i></b>{task.ratio()}"
-            msg += f" | <b><i>Tɪᴍᴇ: </i></b>{task.seeding_time()}"
+            msg += f"\n<b><i>💥Sɪᴢᴇ: </i></b>{task.size()}"
+            msg += f"\n<b><i>🚀Sᴘᴇᴇᴅ: </i></b>{task.seed_speed()}"
+            msg += f"\n<b><i>🚧Uᴘʟᴏᴀᴅᴇᴅ: </i></b>{task.uploaded_bytes()}"
+            msg += f"\n<b><i>🛑Rᴀᴛɪᴏ: </i></b>{task.ratio()}"
+            msg += f" | <b><i>💫Tɪᴍᴇ: </i></b>{task.seeding_time()}"
         else:
-            msg += f"\n<b><i>Sɪᴢᴇ: </i></b>{task.size()}"
-        msg += f"\n<b><i>Tᴏᴏʟ:</i></b> {task.tool}"
+            msg += f"\n<b><i>💥Sɪᴢᴇ: </i></b>{task.size()}"
+        msg += f"\n<b><i>💻Tᴏᴏʟ:</i></b> {task.tool}"
         task_gid = task.gid()
         short_gid = task_gid[-8:] if task_gid.startswith("SABnzbd") else task_gid[:8]
         msg += f"\n/stop_{short_gid}\n\n"
@@ -260,22 +260,22 @@ async def get_readable_message(sid, is_user, page_no=1, status="All", page_step=
     if len(msg) == 0:
         if status == "All":
             return None, None
-        msg = f"<blockquote><i>Nᴏ Aᴄᴛɪᴠᴇ {status} Tᴀsᴋs!</i><blockquote>\n\n"
+        msg = f"<blockquote><i>💦Nᴏ Aᴄᴛɪᴠᴇ {status} Tᴀsᴋs!</i><blockquote>\n\n"
     buttons = ButtonMaker()
     if not is_user:
         buttons.data_button("≈", f"sᴛᴀᴛᴜs {sid} ov", position="header")
     if len(tasks) > STATUS_LIMIT:
         msg += f"<b>Pᴀɢᴇ:</b> {page_no}/{pages} | <b>Tᴀsᴋs:</b> {tasks_no} | <b>Sᴛᴇᴘ:</b> {page_step}\n"
-        buttons.data_button("prev", f"sᴛᴀᴛᴜs {sid} pre", position="header")
-        buttons.data_button("next", f"sᴛᴀᴛᴜs {sid} nex", position="header")
+        buttons.data_button("prev", f"💢sᴛᴀᴛᴜs {sid} pre", position="header")
+        buttons.data_button("next", f"💢sᴛᴀᴛᴜs {sid} nex", position="header")
         if tasks_no > 30:
             for i in [1, 2, 4, 6, 8, 10, 15]:
-                buttons.data_button(i, f"sᴛᴀᴛᴜs {sid} ps {i}", position="footer")
+                buttons.data_button(i, f"💢sᴛᴀᴛᴜs {sid} ps {i}", position="footer")
     if status != "All" or tasks_no > 20:
         for label, status_value in list(STATUSES.items()):
             if status_value != status:
-                buttons.data_button(label, f"sᴛᴀᴛᴜs {sid} st {status_value}")
+                buttons.data_button(label, f"💢sᴛᴀᴛᴜs {sid} st {status_value}")
     button = buttons.build_menu(8)
-    msg += f"<b><i>ᴄᴘᴜ:</i></b> {cpu_percent()}% | <b><i>ғʀᴇᴇ:</i></b> {get_readable_file_size(disk_usage(DOWNLOAD_DIR).free)}"
-    msg += f"\n<b><i>ʀᴀᴍ:</i></b> {virtual_memory().percent}% | <b><i>ᴜᴘᴛɪᴍᴇ:<i></b> {get_readable_time(time() - bot_start_time)}"
+    msg += f"<b><i>🌡️ᴄᴘᴜ:</i></b> {cpu_percent()}% | <b><i>✨ғʀᴇᴇ:</i></b> {get_readable_file_size(disk_usage(DOWNLOAD_DIR).free)}"
+    msg += f"\n<b><i>💻ʀᴀᴍ:</i></b> {virtual_memory().percent}% | <b><i>⛩️ᴜᴘᴛɪᴍᴇ:<i></b> {get_readable_time(time() - bot_start_time)}"
     return msg, button
