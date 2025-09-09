@@ -41,7 +41,7 @@ COMMANDS = {
     "SpeedTest": "- ʀᴜɴ ᴀ ꜱᴘᴇᴇᴅᴛᴇꜱᴛ",
     "BotSetCommand": "- [ᴀᴅᴍɪɴ] ᴏᴘᴇɴ ʙᴏᴛ ꜱᴇᴛᴛɪɴɢꜱ",
     "LogCommand": "- [ᴀᴅᴍɪɴ] ᴠɪᴇᴡ ʙᴏᴛ ʟᴏɢ",
-    "RestartCommand": "- [ᴀᴅᴍɪɴ] ʀᴇꜱᴛᴀʀᴛ ᴛʜᴇ ʙᴏᴛ"
+    "RestartCommand": "- [ᴀᴅᴍɪɴ] ʀᴇꜱᴛᴀʀᴛ ᴛʜᴇ ʙᴏᴛ",
 }
 
 
