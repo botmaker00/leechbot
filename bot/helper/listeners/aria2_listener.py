@@ -33,7 +33,9 @@ async def _on_download_started(api, data):
         if task := await get_task_by_gid(gid):
             task.listener.is_torrent = True
             task.listener.mode = ["Aria2", "Seed"]  # Default for torrent metadata
-            LOGGER.info(f"Aria2Listener: Mode set to {task.listener.mode} for task {task.listener.name}")
+            LOGGER.info(
+                f"Aria2Listener: Mode set to {task.listener.mode} for task {task.listener.name}"
+            )
             if task.listener.select:
                 metamsg = "Downloading Metadata, wait then you can select files. Use torrent file to avoid this wait."
                 meta = await send_message(task.listener.message, metamsg)
@@ -51,12 +53,15 @@ async def _on_download_started(api, data):
     if task := await get_task_by_gid(gid):
         task.listener.mode = ["Aria2", "Telegram"]  # Non-torrent download
         task.listener.name = aria2_name(download)
-        LOGGER.info(f"Aria2Listener: Mode set to {task.listener.mode} for task {task.listener.name}")
+        LOGGER.info(
+            f"Aria2Listener: Mode set to {task.listener.mode} for task {task.listener.name}"
+        )
         msg, button = await stop_duplicate_check(task.listener)
         if msg:
             await TorrentManager.aria2_remove(download)
             await task.listener.on_download_error(msg, button)
     await sleep(2)
+
 
 async def _on_download_complete(api, data):
     try:
@@ -74,7 +79,9 @@ async def _on_download_complete(api, data):
         if task := await get_task_by_gid(new_gid):
             task.listener.is_torrent = True
             task.listener.mode = ["Aria2", "Seed"]  # Update for torrent
-            LOGGER.info(f"Aria2Listener: Mode set to {task.listener.mode} for task {task.listener.name}")
+            LOGGER.info(
+                f"Aria2Listener: Mode set to {task.listener.mode} for task {task.listener.name}"
+            )
             if Config.BASE_URL and task.listener.select:
                 if not task.queued:
                     await api.forcePause(new_gid)
@@ -100,6 +107,7 @@ async def _on_download_complete(api, data):
                 return
             await TorrentManager.aria2_remove(download)
 
+
 async def _on_bt_download_complete(api, data):
     gid = data["params"][0]["gid"]
     await sleep(1)
@@ -107,8 +115,13 @@ async def _on_bt_download_complete(api, data):
     LOGGER.info(f"onBtDownloadComplete: {aria2_name(download)} - Gid: {gid}")
     if task := await get_task_by_gid(gid):
         task.listener.is_torrent = True
-        task.listener.mode = ["Aria2", "Seed" if task.listener.seed else "Telegram"]  # Set based on seeding
-        LOGGER.info(f"Aria2Listener: Mode set to {task.listener.mode} for task {task.listener.name}")
+        task.listener.mode = [
+            "Aria2",
+            "Seed" if task.listener.seed else "Telegram",
+        ]  # Set based on seeding
+        LOGGER.info(
+            f"Aria2Listener: Mode set to {task.listener.mode} for task {task.listener.name}"
+        )
         if task.listener.select:
             res = download.get("files", [])
             for file_o in res:
@@ -163,13 +176,17 @@ async def _on_bt_download_complete(api, data):
         else:
             await TorrentManager.aria2_remove(download)
 
+
 async def _on_download_stopped(_, data):
     gid = data["params"][0]["gid"]
     await sleep(4)
     if task := await get_task_by_gid(gid):
         task.listener.mode = ["Aria2", "Cancelled"]  # Update for stopped task
-        LOGGER.info(f"Aria2Listener: Mode set to {task.listener.mode} for task {task.listener.name}")
+        LOGGER.info(
+            f"Aria2Listener: Mode set to {task.listener.mode} for task {task.listener.name}"
+        )
         await task.listener.on_download_error("Dead torrent!")
+
 
 async def _on_download_error(api, data):
     gid = data["params"][0]["gid"]
@@ -185,8 +202,11 @@ async def _on_download_error(api, data):
         return
     if task := await get_task_by_gid(gid):
         task.listener.mode = ["Aria2", "Error"]  # Update for error
-        LOGGER.info(f"Aria2Listener: Mode set to {task.listener.mode} for task {task.listener.name}")
+        LOGGER.info(
+            f"Aria2Listener: Mode set to {task.listener.mode} for task {task.listener.name}"
+        )
         await task.listener.on_download_error(error)
+
 
 def add_aria2_callbacks():
     TorrentManager.aria2.onBtDownloadComplete(_on_bt_download_complete)
