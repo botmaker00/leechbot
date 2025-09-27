@@ -284,7 +284,7 @@ async def get_readable_message(sid, is_user, page_no=1, status="All", page_step=
             except (AttributeError, IndexError):
                 msg += "\n┟ <b><i>📥 Iɴ Mᴏᴅᴇ</i></b> → <i>Unknown</i>"
                 msg += "\n┟ <b><i>📤 Oᴜᴛ Mᴏᴅᴇ</i></b> → <i>Unknown</i>"
-        msg += f"\n┟ <b><i>💻Tᴏᴏʟ:</i></b> {task.tool}"
+        msg += f"\n┟ <b><i>💻Tᴏᴏʟ:</i></b> → <i>{task.tool}</i>"
         task_gid = task.gid()
         short_gid = task_gid[-8:] if task_gid.startswith("SABnzbd") else task_gid[:8]
         msg += f"\n┖ <b><i>/stop_{short_gid}</i></b>\n\n"
