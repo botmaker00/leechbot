@@ -186,6 +186,9 @@ def source(self):
 
 
 async def get_readable_message(sid, is_user, page_no=1, status="All", page_step=1):
+    msg = ""
+    button = None
+
     tasks = await get_specific_tasks(status, sid if is_user else None)
 
     STATUS_LIMIT = 4
@@ -198,15 +201,14 @@ async def get_readable_message(sid, is_user, page_no=1, status="All", page_step=
         page_no = pages - (abs(page_no) % pages)
         status_dict[sid]["page_no"] = page_no
     start_position = (page_no - 1) * STATUS_LIMIT
-    end_position = page_no * STATUS_LIMIT
 
-    msg = ""
-    for index, task in enumerate(tasks[start_position:end_position], start_position):
-        async with task_dict_lock:
-            if hasattr(task, "seeding"):
-                await task.update()
-            LOGGER.info(f"Task {task.mid} mode: {task.listener.mode}")
-        if iscoroutinefunction(task.status):
+    for index, task in enumerate(
+        tasks[start_position : STATUS_LIMIT + start_position],
+        start=1,
+    ):
+        if status != "All":
+            tstatus = status
+        elif iscoroutinefunction(task.status):
             tstatus = await task.status()
         else:
             tstatus = task.status()
@@ -214,7 +216,7 @@ async def get_readable_message(sid, is_user, page_no=1, status="All", page_step=
         msg += f"<b><i>{escape(task.name())}</i></b>"
         if task.listener.subname:
             msg += f"\n\n<i>{task.listener.subname}</i>"
-        msg += f"\n<b>Task By {source(task)}</b>"
+        msg += f"\n<b>Task By {source(task.listener)}</b>"
         if task.listener.is_super_chat:
             msg += f" <i>[<a href='{task.listener.message.link}'>Link</a>]</i>"
         if (
@@ -231,7 +233,7 @@ async def get_readable_message(sid, is_user, page_no=1, status="All", page_step=
                 subsize = ""
                 count = ""
             msg += f"\n┟ <b><i>📶 Sᴛᴀᴛᴜs</i></b> → <b>{tstatus}</b>"
-            msg += f"\n┟ <b><i>⚡Pʀᴏᴄᴇssᴇᴅ:</i></b> → <i>{task.processed_bytes()}{subsize}</i>"
+            msg += f"\n<b><i>⚡Pʀᴏᴄᴇssᴇᴅ:</i></b> → <i>{task.processed_bytes()}{subsize}</i>"
             if count:
                 msg += f"\n┟ <b><i>💢Cᴏᴜɴᴛ:</i></b> → <b>{count}</b>"
             msg += f"\n┟ <b><i>💥Sɪᴢᴇ:</i></b> → <i>{task.size()}</i>"
@@ -254,8 +256,8 @@ async def get_readable_message(sid, is_user, page_no=1, status="All", page_step=
                 msg += "\n┟ <b><i>📤 Oᴜᴛ Mᴏᴅᴇ</i></b> → <i>Unknown</i>"
         elif tstatus == MirrorStatus.STATUS_SEED:
             msg += f"\n┟ <b><i>📶 Sᴛᴀᴛᴜs</i></b> → <b>{tstatus}</b>"
-            msg += f"\n┟ <b><i>💥Sɪᴢᴇ: </i></b> → <i>{task.size()}</i>"
-            msg += f"\n┟ <b><i>🚀Sᴘᴇᴇᴅ: </i></b> → <i>{task.seed_speed()}</i>"
+            msg += f"\n<b><i>💥Sɪᴢᴇ: </i></b> → <i>{task.size()}</i>"
+            msg += f"\n┟<b><i>🚀Sᴘᴇᴇᴅ: </i></b> → <i>{task.seed_speed()}</i>"
             msg += f"\n┟ <b><i>🚧Uᴘʟᴏᴀᴅᴇᴅ: </i></b> → <i>{task.uploaded_bytes()}</i>"
             msg += f"\n┟ <b><i>🛑Rᴀᴛɪᴏ: </i></b> → <i>{task.ratio()}</i>"
             msg += f" | <b><i>💫Tɪᴍᴇ: </i></b> → <i>{task.seeding_time()}</i>"
