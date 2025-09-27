@@ -180,7 +180,8 @@ def source(self):
     return (
         sender_chat.title
         if (sender_chat := self.message.sender_chat)
-        else self.message.from_user.mention(style='html') + f" ( #ID{self.message.from_user.id} )"
+        else self.message.from_user.mention(style="html")
+        + f" ( #ID{self.message.from_user.id} )"
     )
 
 
