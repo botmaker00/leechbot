@@ -243,8 +243,12 @@ async def get_readable_message(sid, is_user, page_no=1, status="All", page_step=
                 with contextlib.suppress(Exception):
                     msg += f"\n┟ <b><i>Sᴇᴇᴅᴇʀs:</i></b> {task.seeders_num()} | <b><i>Lᴇᴇᴄʜᴇʀs:</i></b> {task.leechers_num()}"
             try:
-                msg += f"\n┟ <b><i>📥 Iɴ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[0]}</i>"
-                msg += f"\n┟ <b><i>📤 Oᴜᴛ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[1]}</i>"
+                msg += (
+                    f"\n┟ <b><i>📥 Iɴ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[0]}</i>"
+                )
+                msg += (
+                    f"\n┟ <b><i>📤 Oᴜᴛ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[1]}</i>"
+                )
             except (AttributeError, IndexError):
                 msg += "\n┟ <b><i>📥 Iɴ Mᴏᴅᴇ</i></b> → <i>Unknown</i>"
                 msg += "\n┟ <b><i>📤 Oᴜᴛ Mᴏᴅᴇ</i></b> → <i>Unknown</i>"
@@ -256,8 +260,12 @@ async def get_readable_message(sid, is_user, page_no=1, status="All", page_step=
             msg += f"\n┟ <b><i>🛑Rᴀᴛɪᴏ: </i></b> → <i>{task.ratio()}</i>"
             msg += f" | <b><i>💫Tɪᴍᴇ: </i></b> → <i>{task.seeding_time()}</i>"
             try:
-                msg += f"\n┟ <b><i>📥 Iɴ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[0]}</i>"
-                msg += f"\n┟ <b><i>📤 Oᴜᴛ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[1]}</i>"
+                msg += (
+                    f"\n┟ <b><i>📥 Iɴ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[0]}</i>"
+                )
+                msg += (
+                    f"\n┟ <b><i>📤 Oᴜᴛ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[1]}</i>"
+                )
             except (AttributeError, IndexError):
                 msg += "\n┟ <b><i>📥 Iɴ Mᴏᴅᴇ</i></b> → <i>Unknown</i>"
                 msg += "\n┟ <b><i>📤 Oᴜᴛ Mᴏᴅᴇ</i></b> → <i>Unknown</i>"
@@ -265,8 +273,12 @@ async def get_readable_message(sid, is_user, page_no=1, status="All", page_step=
             msg += f"\n┟ <b><i>📶 Sᴛᴀᴛᴜs</i></b> → <b>{tstatus}</b>"
             msg += f"\n┟ <b><i>💥Sɪᴢᴇ: </i></b> → <i>{task.size()} </i>"
             try:
-                msg += f"\n┟ <b><i>📥 Iɴ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[0]}</i>"
-                msg += f"\n┟ <b><i>📤 Oᴜᴛ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[1]}</i>"
+                msg += (
+                    f"\n┟ <b><i>📥 Iɴ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[0]}</i>"
+                )
+                msg += (
+                    f"\n┟ <b><i>📤 Oᴜᴛ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[1]}</i>"
+                )
             except (AttributeError, IndexError):
                 msg += "\n┟ <b><i>📥 Iɴ Mᴏᴅᴇ</i></b> → <i>Unknown</i>"
                 msg += "\n┟ <b><i>📤 Oᴜᴛ Mᴏᴅᴇ</i></b> → <i>Unknown</i>"
