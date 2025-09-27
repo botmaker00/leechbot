@@ -21,6 +21,8 @@ async def _remove_job(nzo_id, mid):
 @new_task
 async def _on_download_error(err, nzo_id, button=None):
     if task := await get_task_by_gid(nzo_id):
+        task.listener.mode = ["NZB", "Error"]  # Update for error
+        LOGGER.info(f"NzbListener: Mode set to {task.listener.mode} for task {task.listener.name}")
         LOGGER.info(f"Cancelling Download: {task.name()}")
         await gather(
             task.listener.on_download_error(err, button),
@@ -33,14 +35,18 @@ async def _stop_duplicate(nzo_id):
     if task := await get_task_by_gid(nzo_id):
         await task.update()
         task.listener.name = task.name()
+        task.listener.mode = ["NZB", "Telegram"]  # Set mode
+        LOGGER.info(f"NzbListener: Mode set to {task.listener.mode} for task {task.listener.name}")
         msg, button = await stop_duplicate_check(task.listener)
         if msg:
-            _on_download_error(msg, nzo_id, button)
+            await _on_download_error(msg, nzo_id, button)
 
 
 @new_task
 async def _on_download_complete(nzo_id):
     if task := await get_task_by_gid(nzo_id):
+        task.listener.mode[0] = "NZB"  # Ensure In Mode is set
+        LOGGER.info(f"NzbListener: Mode set to {task.listener.mode} for task {task.listener.name}")
         await task.listener.on_download_complete()
         if intervals["stopAll"]:
             return
@@ -93,6 +99,10 @@ async def on_download_start(nzo_id):
             "uploaded": False,
             "stop_dup_check": False,
             "status": "Downloading",
+            "mode": ["NZB", "Telegram"],  # Default mode
         }
+        if task := await get_task_by_gid(nzo_id):
+            task.listener.mode = nzb_jobs[nzo_id]["mode"]
+            LOGGER.info(f"NzbListener: Mode set to {task.listener.mode} for task {task.listener.name}")
         if not intervals["nzb"]:
             intervals["nzb"] = await _nzb_listener()
