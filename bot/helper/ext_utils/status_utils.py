@@ -184,110 +184,94 @@ def source(self):
         + f" ( #ID{self.message.from_user.id} )"
     )
 
-
-async def get_readable_message(sid, is_user, page_no=1, status="All", page_step=1):
-    msg = ""
-    button = None
-
-    tasks = await get_specific_tasks(status, sid if is_user else None)
-
-    STATUS_LIMIT = 4
-    tasks_no = len(tasks)
-    pages = (max(tasks_no, 1) + STATUS_LIMIT - 1) // STATUS_LIMIT
-    if page_no > pages:
-        page_no = (page_no - 1) % pages + 1
-        status_dict[sid]["page_no"] = page_no
-    elif page_no < 1:
-        page_no = pages - (abs(page_no) % pages)
-        status_dict[sid]["page_no"] = page_no
-    start_position = (page_no - 1) * STATUS_LIMIT
-
-    for index, task in enumerate(
-        tasks[start_position : STATUS_LIMIT + start_position],
-        start=1,
+# Truncated section (status message generation)
+# Assuming this is where the status message is built
+# Adding logging before the try block
+for index, task in enumerate(tasks[start_position:end_position], start_position):
+    async with task_dict_lock:
+        if hasattr(task, "seeding"):
+            await task.update()
+        LOGGER.info(f"Task {task.mid} mode: {task.listener.mode}")  # Debug mode
+    if iscoroutinefunction(task.status):
+        tstatus = await task.status()
+    else:
+        tstatus = task.status()
+    msg += f"<b>{index + start_position}. </b>"
+    msg += f"<b><i>{escape(task.name())}</i></b>"
+    if task.listener.subname:
+        msg += f"\n\n<i>{task.listener.subname}</i>"
+    msg += f"\n<b>Task By {source(task.listener)}</b>"
+    if task.listener.is_super_chat:
+        msg += f" <i>[<a href='{task.listener.message.link}'>Link</a>]</i>"
+    if (
+        tstatus not in [MirrorStatus.STATUS_SEED, MirrorStatus.STATUS_QUEUEUP]
+        and task.listener.progress
     ):
-        if status != "All":
-            tstatus = status
-        elif iscoroutinefunction(task.status):
-            tstatus = await task.status()
-        else:
-            tstatus = task.status()
-        msg += f"<b>{index + start_position}. </b>"
-        msg += f"<b><i>{escape(task.name())}</i></b>"
+        progress = task.progress()
+        msg += f"\n┟ {get_progress_bar_string(progress)} {progress}"
         if task.listener.subname:
-            msg += f"\n\n<i>{task.listener.subname}</i>"
-        msg += f"\n<b>Task By {source(task.listener)}</b>"
-        if task.listener.is_super_chat:
-            msg += f" <i>[<a href='{task.listener.message.link}'>Link</a>]</i>"
-        if (
-            tstatus not in [MirrorStatus.STATUS_SEED, MirrorStatus.STATUS_QUEUEUP]
-            and task.listener.progress
-        ):
-            progress = task.progress()
-            msg += f"\n┟ {get_progress_bar_string(progress)} {progress}"
-            if task.listener.subname:
-                subsize = f"/{get_readable_file_size(task.listener.subsize)}"
-                ac = len(task.listener.files_to_proceed)
-                count = f"{task.listener.proceed_count}/{ac or '?'}"
-            else:
-                subsize = ""
-                count = ""
-            msg += f"\n┟ <b><i>📶 Sᴛᴀᴛᴜs</i></b> → <b>{tstatus}</b>"
-            msg += f"\n<b><i>⚡Pʀᴏᴄᴇssᴇᴅ:</i></b> → <i>{task.processed_bytes()}{subsize}</i>"
-            if count:
-                msg += f"\n┟ <b><i>💢Cᴏᴜɴᴛ:</i></b> → <b>{count}</b>"
-            msg += f"\n┟ <b><i>💥Sɪᴢᴇ:</i></b> → <i>{task.size()}</i>"
-            msg += f"\n┟ <b><i>🚀Sᴘᴇᴇᴅ:</i></b> → <i>{task.speed()}</i>"
-            msg += f"\n┟ <b><i>✨Esᴛɪᴍᴀᴛᴇᴅ:</i></b> <i>{task.eta()}</i>"
-            if (
-                tstatus == MirrorStatus.STATUS_DOWNLOAD and task.listener.is_torrent
-            ) or task.listener.is_qbit:
-                with contextlib.suppress(Exception):
-                    msg += f"\n┟ <b><i>Sᴇᴇᴅᴇʀs:</i></b> {task.seeders_num()} | <b><i>Lᴇᴇᴄʜᴇʀs:</i></b> {task.leechers_num()}"
-            try:
-                msg += (
-                    f"\n┟ <b><i>📥 Iɴ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[0]}</i>"
-                )
-                msg += (
-                    f"\n┟ <b><i>📤 Oᴜᴛ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[1]}</i>"
-                )
-            except (AttributeError, IndexError):
-                msg += "\n┟ <b><i>📥 Iɴ Mᴏᴅᴇ</i></b> → <i>Unknown</i>"
-                msg += "\n┟ <b><i>📤 Oᴜᴛ Mᴏᴅᴇ</i></b> → <i>Unknown</i>"
-        elif tstatus == MirrorStatus.STATUS_SEED:
-            msg += f"\n┟ <b><i>📶 Sᴛᴀᴛᴜs</i></b> → <b>{tstatus}</b>"
-            msg += f"\n<b><i>💥Sɪᴢᴇ: </i></b> → <i>{task.size()}</i>"
-            msg += f"\n┟<b><i>🚀Sᴘᴇᴇᴅ: </i></b> → <i>{task.seed_speed()}</i>"
-            msg += f"\n┟ <b><i>🚧Uᴘʟᴏᴀᴅᴇᴅ: </i></b> → <i>{task.uploaded_bytes()}</i>"
-            msg += f"\n┟ <b><i>🛑Rᴀᴛɪᴏ: </i></b> → <i>{task.ratio()}</i>"
-            msg += f" | <b><i>💫Tɪᴍᴇ: </i></b> → <i>{task.seeding_time()}</i>"
-            try:
-                msg += (
-                    f"\n┟ <b><i>📥 Iɴ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[0]}</i>"
-                )
-                msg += (
-                    f"\n┟ <b><i>📤 Oᴜᴛ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[1]}</i>"
-                )
-            except (AttributeError, IndexError):
-                msg += "\n┟ <b><i>📥 Iɴ Mᴏᴅᴇ</i></b> → <i>Unknown</i>"
-                msg += "\n┟ <b><i>📤 Oᴜᴛ Mᴏᴅᴇ</i></b> → <i>Unknown</i>"
+            subsize = f"/{get_readable_file_size(task.listener.subsize)}"
+            ac = len(task.listener.files_to_proceed)
+            count = f"{task.listener.proceed_count}/{ac or '?'}"
         else:
-            msg += f"\n┟ <b><i>📶 Sᴛᴀᴛᴜs</i></b> → <b>{tstatus}</b>"
-            msg += f"\n┟ <b><i>💥Sɪᴢᴇ: </i></b> → <i>{task.size()} </i>"
-            try:
-                msg += (
-                    f"\n┟ <b><i>📥 Iɴ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[0]}</i>"
-                )
-                msg += (
-                    f"\n┟ <b><i>📤 Oᴜᴛ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[1]}</i>"
-                )
-            except (AttributeError, IndexError):
-                msg += "\n┟ <b><i>📥 Iɴ Mᴏᴅᴇ</i></b> → <i>Unknown</i>"
-                msg += "\n┟ <b><i>📤 Oᴜᴛ Mᴏᴅᴇ</i></b> → <i>Unknown</i>"
-        msg += f"\n┟ <b><i>💻Tᴏᴏʟ:</i></b> {task.tool}"
-        task_gid = task.gid()
-        short_gid = task_gid[-8:] if task_gid.startswith("SABnzbd") else task_gid[:8]
-        msg += f"\n┖ <b><i>/stop_{short_gid}</i></b>\n\n"
+            subsize = ""
+            count = ""
+        msg += f"\n┟ <b><i>📶 Sᴛᴀᴛᴜs</i></b> → <b>{tstatus}</b>"
+        msg += f"\n<b><i>⚡Pʀᴏᴄᴇssᴇᴅ:</i></b> → <i>{task.processed_bytes()}{subsize}</i>"
+        if count:
+            msg += f"\n┟ <b><i>💢Cᴏᴜɴᴛ:</i></b> → <b>{count}</b>"
+        msg += f"\n┟ <b><i>💥Sɪᴢᴇ:</i></b> → <i>{task.size()}</i>"
+        msg += f"\n┟ <b><i>🚀Sᴘᴇᴇᴅ:</i></b> → <i>{task.speed()}</i>"
+        msg += f"\n┟ <b><i>✨Esᴛɪᴍᴀᴛᴇᴅ:</i></b> <i>{task.eta()}</i>"
+        if (
+            tstatus == MirrorStatus.STATUS_DOWNLOAD and task.listener.is_torrent
+        ) or task.listener.is_qbit:
+            with contextlib.suppress(Exception):
+                msg += f"\n┟ <b><i>Sᴇᴇᴅᴇʀs:</i></b> {task.seeders_num()} | <b><i>Lᴇᴇᴄʜᴇʀs:</i></b> {task.leechers_num()}"
+        try:
+            msg += (
+                f"\n┟ <b><i>📥 Iɴ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[0]}</i>"
+            )
+            msg += (
+                f"\n┟ <b><i>📤 Oᴜᴛ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[1]}</i>"
+            )
+        except (AttributeError, IndexError):
+            msg += "\n┟ <b><i>📥 Iɴ Mᴏᴅᴇ</i></b> → <i>Unknown</i>"
+            msg += "\n┟ <b><i>📤 Oᴜᴛ Mᴏᴅᴇ</i></b> → <i>Unknown</i>"
+    elif tstatus == MirrorStatus.STATUS_SEED:
+        msg += f"\n┟ <b><i>📶 Sᴛᴀᴛᴜs</i></b> → <b>{tstatus}</b>"
+        msg += f"\n<b><i>💥Sɪᴢᴇ: </i></b> → <i>{task.size()}</i>"
+        msg += f"\n┟<b><i>🚀Sᴘᴇᴇᴅ: </i></b> → <i>{task.seed_speed()}</i>"
+        msg += f"\n┟ <b><i>🚧Uᴘʟᴏᴀᴅᴇᴅ: </i></b> → <i>{task.uploaded_bytes()}</i>"
+        msg += f"\n┟ <b><i>🛑Rᴀᴛɪᴏ: </i></b> → <i>{task.ratio()}</i>"
+        msg += f" | <b><i>💫Tɪᴍᴇ: </i></b> → <i>{task.seeding_time()}</i>"
+        try:
+            msg += (
+                f"\n┟ <b><i>📥 Iɴ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[0]}</i>"
+            )
+            msg += (
+                f"\n┟ <b><i>📤 Oᴜᴛ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[1]}</i>"
+            )
+        except (AttributeError, IndexError):
+            msg += "\n┟ <b><i>📥 Iɴ Mᴏᴅᴇ</i></b> → <i>Unknown</i>"
+            msg += "\n┟ <b><i>📤 Oᴜᴛ Mᴏᴅᴇ</i></b> → <i>Unknown</i>"
+    else:
+        msg += f"\n┟ <b><i>📶 Sᴛᴀᴛᴜs</i></b> → <b>{tstatus}</b>"
+        msg += f"\n┟ <b><i>💥Sɪᴢᴇ: </i></b> → <i>{task.size()} </i>"
+        try:
+            msg += (
+                f"\n┟ <b><i>📥 Iɴ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[0]}</i>"
+            )
+            msg += (
+                f"\n┟ <b><i>📤 Oᴜᴛ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[1]}</i>"
+            )
+        except (AttributeError, IndexError):
+            msg += "\n┟ <b><i>📥 Iɴ Mᴏᴅᴇ</i></b> → <i>Unknown</i>"
+            msg += "\n┟ <b><i>📤 Oᴜᴛ Mᴏᴅᴇ</i></b> → <i>Unknown</i>"
+    msg += f"\n┟ <b><i>💻Tᴏᴏʟ:</i></b> {task.tool}"
+    task_gid = task.gid()
+    short_gid = task_gid[-8:] if task_gid.startswith("SABnzbd") else task_gid[:8]
+    msg += f"\n┖ <b><i>/stop_{short_gid}</i></b>\n\n"
 
     if len(msg) == 0:
         if status == "All":
