@@ -60,6 +60,8 @@ from bot.helper.telegram_helper.message_utils import (
 class TaskListener(TaskConfig):
     def __init__(self):
         super().__init__()
+        self.mode = ["Unknown", "Unknown"]  # Initialize mode with default values
+        LOGGER.info(f"TaskListener: Initialized mode to {self.mode}")
 
     async def clean(self):
         try:
@@ -104,6 +106,16 @@ class TaskListener(TaskConfig):
         await sleep(2)
         if self.is_cancelled:
             return
+        # Update Out Mode based on upload destination
+        if self.is_youtube:
+            self.mode[1] = "YouTube"
+        elif is_gdrive_id(self.up_dir):
+            self.mode[1] = "Google Drive"
+        elif self.seed:
+            self.mode[1] = "Seed"
+        else:
+            self.mode[1] = "Telegram"
+        LOGGER.info(f"Task {self.mid} Out Mode set to: {self.mode[1]}")
         multi_links = False
         if (
             self.folder_name
@@ -230,6 +242,7 @@ class TaskListener(TaskConfig):
             self.name = up_path.replace(f"{up_dir}/", "").split("/", 1)[0]
             self.size = await get_path_size(up_dir)
             self.clear()
+            await remove_excluded_files(up_dir, self.excluded_extensions)
 
         if self.metadata:
             up_path = await self.proceed_metadata(
