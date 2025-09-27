@@ -38,6 +38,8 @@ async def _on_download_error(err, tor, button=None):
     LOGGER.info(f"Cancelling Download: {tor.name}")
     ext_hash = tor.hash
     if task := await get_task_by_gid(ext_hash[:12]):
+        task.listener.mode = ["qBittorrent", "Error"]  # Update for error
+        LOGGER.info(f"QbitListener: Mode set to {task.listener.mode} for task {task.listener.name}")
         await task.listener.on_download_error(err, button)
     await TorrentManager.qbittorrent.torrents.stop([ext_hash])
     await sleep(0.3)
@@ -49,6 +51,8 @@ async def _on_seed_finish(tor):
     ext_hash = tor.hash
     LOGGER.info(f"Cancelling Seed: {tor.name}")
     if task := await get_task_by_gid(ext_hash[:12]):
+        task.listener.mode = ["qBittorrent", "Seed"]  # Update for seeding
+        LOGGER.info(f"QbitListener: Mode set to {task.listener.mode} for task {task.listener.name}")
         msg = f"Seeding stopped with Ratio: {round(tor.ratio, 3)} and Time: {get_readable_time(int(tor.seeding_time.total_seconds() or '0'))}"
         await task.listener.on_upload_error(msg)
     await _remove_torrent(ext_hash, tor.tags[0])
@@ -63,9 +67,11 @@ async def _stop_duplicate(tor):
             ".!qB",
             1,
         )[0]
+        task.listener.mode = ["qBittorrent", "Telegram"]  # Set mode
+        LOGGER.info(f"QbitListener: Mode set to {task.listener.mode} for task {task.listener.name}")
         msg, button = await stop_duplicate_check(task.listener)
         if msg:
-            _on_download_error(msg, tor, button)
+            await _on_download_error(msg, tor, button)
 
 
 @new_task
@@ -73,6 +79,8 @@ async def _on_download_complete(tor):
     ext_hash = tor.hash
     tag = tor.tags[0]
     if task := await get_task_by_gid(ext_hash[:12]):
+        task.listener.mode = ["qBittorrent", "Seed" if task.listener.seed else "Telegram"]  # Set based on seeding
+        LOGGER.info(f"QbitListener: Mode set to {task.listener.mode} for task {task.listener.name}")
         if not task.listener.seed:
             await TorrentManager.qbittorrent.torrents.stop([ext_hash])
         if task.listener.select:
@@ -210,5 +218,8 @@ async def on_download_start(tag):
             "uploaded": False,
             "seeding": False,
         }
+        if task := await get_task_by_gid(tag[:12]):
+            task.listener.mode = ["qBittorrent", "Telegram"]  # Default mode
+            LOGGER.info(f"QbitListener: Mode set to {task.listener.mode} for task {task.listener.name}")
         if not intervals["qb"]:
             intervals["qb"] = await _qb_listener()
