@@ -14,6 +14,8 @@ async def remove_download(gid):
         package_ids=jd_downloads[gid]["ids"],
     )
     if task := await get_task_by_gid(gid):
+        task.listener.mode = ["JDownloader", "Cancelled"]  # Update for cancelled task
+        LOGGER.info(f"JdownloaderListener: Mode set to {task.listener.mode} for task {task.listener.name}")
         await task.listener.on_download_error("Download removed manually!")
         async with jd_listener_lock:
             del jd_downloads[gid]
@@ -22,6 +24,8 @@ async def remove_download(gid):
 @new_task
 async def _on_download_complete(gid):
     if task := await get_task_by_gid(gid):
+        task.listener.mode[0] = "JDownloader"  # Ensure In Mode is set
+        LOGGER.info(f"JdownloaderListener: Mode set to {task.listener.mode} for task {task.listener.name}")
         if task.listener.select:
             async with jd_listener_lock:
                 await jdownloader.device.downloads.cleanup(
@@ -88,4 +92,7 @@ async def _jd_listener():
 async def on_download_start():
     async with jd_listener_lock:
         if not intervals["jd"]:
+            if task := await get_task_by_gid(list(jd_downloads.keys())[0] if jd_downloads else None):
+                task.listener.mode = ["JDownloader", "Telegram"]  # Default mode
+                LOGGER.info(f"JdownloaderListener: Mode set to {task.listener.mode} for task {task.listener.name}")
             intervals["jd"] = await _jd_listener()
