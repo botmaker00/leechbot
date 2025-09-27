@@ -168,20 +168,19 @@ def speed_string_to_bytes(size_text: str):
 
 
 def get_progress_bar_string(pct):
-    if isinstance(pct, str):
-        pct = float(pct.strip("%"))
+    pct = float(str(pct).strip("%"))
     p = min(max(pct, 0), 100)
-    c_full = int(p // 10)
-    p_str = "★" * c_full
-    p_str += "☆" * (10 - c_full)
-    return p_str
+    cFull = int(p // 10)
+    p_str = "▰" * cFull
+    p_str += "▱" * (10 - cFull)
+    return f"[{p_str}]"
 
 
 def source(self):
     return (
         sender_chat.title
         if (sender_chat := self.message.sender_chat)
-        else self.message.from_user.username or self.message.from_user.id
+        else self.message.from_user.mention(style='html') + f" ( #ID{self.message.from_user.id} )"
     )
 
 
@@ -212,14 +211,13 @@ async def get_readable_message(sid, is_user, page_no=1, status="All", page_step=
             tstatus = await task.status()
         else:
             tstatus = task.status()
-        if task.listener.is_super_chat:
-            msg += f"<b>{index + start_position}. <a href='{task.listener.message.link}'>{tstatus}</a>: </b>"
-        else:
-            msg += f"<b>{index + start_position}. {tstatus}: </b>"
+        msg += f"<b>{index + start_position}. </b>"
         msg += f"<code>{escape(f'{task.name()}')}</code>"
         if task.listener.subname:
             msg += f"\n<i>{task.listener.subname}</i>"
-        msg += f"\n⛩️by: {source(task.listener)}"
+        msg += f"\n<b>Task By {source(task.listener)}</b>"
+        if task.listener.is_super_chat:
+            msg += f" <i>[<a href='{task.listener.message.link}'>Link</a>]</i>"
         if (
             tstatus not in [MirrorStatus.STATUS_SEED, MirrorStatus.STATUS_QUEUEUP]
             and task.listener.progress
@@ -233,6 +231,7 @@ async def get_readable_message(sid, is_user, page_no=1, status="All", page_step=
             else:
                 subsize = ""
                 count = ""
+            msg += f"\n<b><i>📶 Sᴛᴀᴛᴜs</i></b> → <b>{tstatus}</b>"
             msg += f"\n<b><i>⚡Pʀᴏᴄᴇssᴇᴅ:</i></b> {task.processed_bytes()}{subsize}"
             if count:
                 msg += f"\n<b><i>💢Cᴏᴜɴᴛ:</i></b> {count}"
@@ -244,14 +243,22 @@ async def get_readable_message(sid, is_user, page_no=1, status="All", page_step=
             ) or task.listener.is_qbit:
                 with contextlib.suppress(Exception):
                     msg += f"\n<b><i>Sᴇᴇᴅᴇʀs:</i></b> {task.seeders_num()} | <b><i>Lᴇᴇᴄʜᴇʀs:</i></b> {task.leechers_num()}"
+            msg += f"\n<b><i>📥 Iɴ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[0]}</i>"
+            msg += f"\n<b><i>📤 Oᴜᴛ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[1]}</i>"
         elif tstatus == MirrorStatus.STATUS_SEED:
+            msg += f"\n<b><i>📶 Sᴛᴀᴛᴜs</i></b> → <b>{tstatus}</b>"
             msg += f"\n<b><i>💥Sɪᴢᴇ: </i></b>{task.size()}"
             msg += f"\n<b><i>🚀Sᴘᴇᴇᴅ: </i></b>{task.seed_speed()}"
             msg += f"\n<b><i>🚧Uᴘʟᴏᴀᴅᴇᴅ: </i></b>{task.uploaded_bytes()}"
             msg += f"\n<b><i>🛑Rᴀᴛɪᴏ: </i></b>{task.ratio()}"
             msg += f" | <b><i>💫Tɪᴍᴇ: </i></b>{task.seeding_time()}"
+            msg += f"\n<b><i>📥 Iɴ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[0]}</i>"
+            msg += f"\n<b><i>📤 Oᴜᴛ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[1]}</i>"
         else:
+            msg += f"\n<b><i>📶 Sᴛᴀᴛᴜs</i></b> → <b>{tstatus}</b>"
             msg += f"\n<b><i>💥Sɪᴢᴇ: </i></b>{task.size()}"
+            msg += f"\n<b><i>📥 Iɴ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[0]}</i>"
+            msg += f"\n<b><i>📤 Oᴜᴛ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[1]}</i>"
         msg += f"\n<b><i>💻Tᴏᴏʟ:</i></b> {task.tool}"
         task_gid = task.gid()
         short_gid = task_gid[-8:] if task_gid.startswith("SABnzbd") else task_gid[:8]
@@ -260,7 +267,7 @@ async def get_readable_message(sid, is_user, page_no=1, status="All", page_step=
     if len(msg) == 0:
         if status == "All":
             return None, None
-        msg = f"<blockquote><i>💦Nᴏ Aᴄᴛɪᴠᴇ {status} Tᴀsᴋs!</i><blockquote>\n\n"
+        msg = f"<blockquote><i>💦Nᴏ Aᴄᴛɪᴠᴇ {status} Tᴀsᴋs!</i></blockquote>\n\n"
     buttons = ButtonMaker()
     if not is_user:
         buttons.data_button("≈", f"sᴛᴀᴛᴜs {sid} ov", position="header")
