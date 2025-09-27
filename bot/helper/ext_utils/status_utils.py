@@ -180,7 +180,8 @@ def source(self):
     return (
         sender_chat.title
         if (sender_chat := self.message.sender_chat)
-        else self.message.from_user.mention(style='html') + f" ( #ID{self.message.from_user.id} )"
+        else self.message.from_user.mention(style="html")
+        + f" ( #ID{self.message.from_user.id} )"
     )
 
 
@@ -245,10 +246,12 @@ async def get_readable_message(sid, is_user, page_no=1, status="All", page_step=
                     msg += f"\n<b><i>Sᴇᴇᴅᴇʀs:</i></b> {task.seeders_num()} | <b><i>Lᴇᴇᴄʜᴇʀs:</i></b> {task.leechers_num()}"
             try:
                 msg += f"\n<b><i>📥 Iɴ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[0]}</i>"
-                msg += f"\n<b><i>📤 Oᴜᴛ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[1]}</i>"
+                msg += (
+                    f"\n<b><i>📤 Oᴜᴛ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[1]}</i>"
+                )
             except (AttributeError, IndexError):
-                msg += f"\n<b><i>📥 Iɴ Mᴏᴅᴇ</i></b> → <i>Unknown</i>"
-                msg += f"\n<b><i>📤 Oᴜᴛ Mᴏᴅᴇ</i></b> → <i>Unknown</i>"
+                msg += "\n<b><i>📥 Iɴ Mᴏᴅᴇ</i></b> → <i>Unknown</i>"
+                msg += "\n<b><i>📤 Oᴜᴛ Mᴏᴅᴇ</i></b> → <i>Unknown</i>"
         elif tstatus == MirrorStatus.STATUS_SEED:
             msg += f"\n<b><i>📶 Sᴛᴀᴛᴜs</i></b> → <b>{tstatus}</b>"
             msg += f"\n<b><i>💥Sɪᴢᴇ: </i></b>{task.size()}"
@@ -258,19 +261,23 @@ async def get_readable_message(sid, is_user, page_no=1, status="All", page_step=
             msg += f" | <b><i>💫Tɪᴍᴇ: </i></b>{task.seeding_time()}"
             try:
                 msg += f"\n<b><i>📥 Iɴ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[0]}</i>"
-                msg += f"\n<b><i>📤 Oᴜᴛ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[1]}</i>"
+                msg += (
+                    f"\n<b><i>📤 Oᴜᴛ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[1]}</i>"
+                )
             except (AttributeError, IndexError):
-                msg += f"\n<b><i>📥 Iɴ Mᴏᴅᴇ</i></b> → <i>Unknown</i>"
-                msg += f"\n<b><i>📤 Oᴜᴛ Mᴏᴅᴇ</i></b> → <i>Unknown</i>"
+                msg += "\n<b><i>📥 Iɴ Mᴏᴅᴇ</i></b> → <i>Unknown</i>"
+                msg += "\n<b><i>📤 Oᴜᴛ Mᴏᴅᴇ</i></b> → <i>Unknown</i>"
         else:
             msg += f"\n<b><i>📶 Sᴛᴀᴛᴜs</i></b> → <b>{tstatus}</b>"
             msg += f"\n<b><i>💥Sɪᴢᴇ: </i></b>{task.size()}"
             try:
                 msg += f"\n<b><i>📥 Iɴ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[0]}</i>"
-                msg += f"\n<b><i>📤 Oᴜᴛ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[1]}</i>"
+                msg += (
+                    f"\n<b><i>📤 Oᴜᴛ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[1]}</i>"
+                )
             except (AttributeError, IndexError):
-                msg += f"\n<b><i>📥 Iɴ Mᴏᴅᴇ</i></b> → <i>Unknown</i>"
-                msg += f"\n<b><i>📤 Oᴜᴛ Mᴏᴅᴇ</i></b> → <i>Unknown</i>"
+                msg += "\n<b><i>📥 Iɴ Mᴏᴅᴇ</i></b> → <i>Unknown</i>"
+                msg += "\n<b><i>📤 Oᴜᴛ Mᴏᴅᴇ</i></b> → <i>Unknown</i>"
         msg += f"\n<b><i>💻Tᴏᴏʟ:</i></b> {task.tool}"
         task_gid = task.gid()
         short_gid = task_gid[-8:] if task_gid.startswith("SABnzbd") else task_gid[:8]
