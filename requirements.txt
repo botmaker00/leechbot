@@ -12,6 +12,7 @@ tgcrypto
 #tgcrypto-pyrofork # Optional for pyrofork. Comment out other tgcrypto if using this
 #tgcrypto-pyroblack # Optional for pyroblack. Comment out other tgcrypto if using this
 #ElectroCrypto # Optional for elctrogram. Comment out other tgcrypto if using this
+qrcode[pil]
 
 asyncio
 aiofiles>=23.1.0
