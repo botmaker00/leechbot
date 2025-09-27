@@ -107,8 +107,9 @@ class TaskListener(TaskConfig):
         if self.is_cancelled:
             return
         # Update Out Mode based on upload destination
-        if self.is_youtube:
+        if getattr(self, "is_youtube", False):
             self.mode[1] = "YouTube"
+
         elif is_gdrive_id(self.up_dir):
             self.mode[1] = "Google Drive"
         elif self.seed:
