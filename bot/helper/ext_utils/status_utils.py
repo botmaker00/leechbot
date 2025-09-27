@@ -5,7 +5,7 @@ from time import time
 
 from psutil import cpu_percent, disk_usage, virtual_memory
 
-from bot import DOWNLOAD_DIR, bot_start_time, status_dict, task_dict, task_dict_lock
+from bot import DOWNLOAD_DIR, bot_start_time, task_dict, task_dict_lock
 from bot.helper.telegram_helper.button_build import ButtonMaker
 
 SIZE_UNITS = ["B", "KB", "MB", "GB", "TB", "PB"]
@@ -184,6 +184,7 @@ def source(self):
         + f" ( #ID{self.message.from_user.id} )"
     )
 
+
 # Truncated section (status message generation)
 # Assuming this is where the status message is built
 # Adding logging before the try block
@@ -229,12 +230,8 @@ for index, task in enumerate(tasks[start_position:end_position], start_position)
             with contextlib.suppress(Exception):
                 msg += f"\n┟ <b><i>Sᴇᴇᴅᴇʀs:</i></b> {task.seeders_num()} | <b><i>Lᴇᴇᴄʜᴇʀs:</i></b> {task.leechers_num()}"
         try:
-            msg += (
-                f"\n┟ <b><i>📥 Iɴ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[0]}</i>"
-            )
-            msg += (
-                f"\n┟ <b><i>📤 Oᴜᴛ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[1]}</i>"
-            )
+            msg += f"\n┟ <b><i>📥 Iɴ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[0]}</i>"
+            msg += f"\n┟ <b><i>📤 Oᴜᴛ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[1]}</i>"
         except (AttributeError, IndexError):
             msg += "\n┟ <b><i>📥 Iɴ Mᴏᴅᴇ</i></b> → <i>Unknown</i>"
             msg += "\n┟ <b><i>📤 Oᴜᴛ Mᴏᴅᴇ</i></b> → <i>Unknown</i>"
@@ -246,12 +243,8 @@ for index, task in enumerate(tasks[start_position:end_position], start_position)
         msg += f"\n┟ <b><i>🛑Rᴀᴛɪᴏ: </i></b> → <i>{task.ratio()}</i>"
         msg += f" | <b><i>💫Tɪᴍᴇ: </i></b> → <i>{task.seeding_time()}</i>"
         try:
-            msg += (
-                f"\n┟ <b><i>📥 Iɴ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[0]}</i>"
-            )
-            msg += (
-                f"\n┟ <b><i>📤 Oᴜᴛ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[1]}</i>"
-            )
+            msg += f"\n┟ <b><i>📥 Iɴ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[0]}</i>"
+            msg += f"\n┟ <b><i>📤 Oᴜᴛ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[1]}</i>"
         except (AttributeError, IndexError):
             msg += "\n┟ <b><i>📥 Iɴ Mᴏᴅᴇ</i></b> → <i>Unknown</i>"
             msg += "\n┟ <b><i>📤 Oᴜᴛ Mᴏᴅᴇ</i></b> → <i>Unknown</i>"
@@ -259,12 +252,8 @@ for index, task in enumerate(tasks[start_position:end_position], start_position)
         msg += f"\n┟ <b><i>📶 Sᴛᴀᴛᴜs</i></b> → <b>{tstatus}</b>"
         msg += f"\n┟ <b><i>💥Sɪᴢᴇ: </i></b> → <i>{task.size()} </i>"
         try:
-            msg += (
-                f"\n┟ <b><i>📥 Iɴ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[0]}</i>"
-            )
-            msg += (
-                f"\n┟ <b><i>📤 Oᴜᴛ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[1]}</i>"
-            )
+            msg += f"\n┟ <b><i>📥 Iɴ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[0]}</i>"
+            msg += f"\n┟ <b><i>📤 Oᴜᴛ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[1]}</i>"
         except (AttributeError, IndexError):
             msg += "\n┟ <b><i>📥 Iɴ Mᴏᴅᴇ</i></b> → <i>Unknown</i>"
             msg += "\n┟ <b><i>📤 Oᴜᴛ Mᴏᴅᴇ</i></b> → <i>Unknown</i>"
