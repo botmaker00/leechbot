@@ -233,12 +233,12 @@ async def get_readable_message(sid, is_user, page_no=1, status="All", page_step=
                 subsize = ""
                 count = ""
             msg += f"\n<b><i>📶 Sᴛᴀᴛᴜs</i></b> → <b>{tstatus}</b>"
-            msg += f"\n<b><i>⚡Pʀᴏᴄᴇssᴇᴅ:</i></b> {task.processed_bytes()}{subsize}"
+            msg += f"\n<b><i>⚡Pʀᴏᴄᴇssᴇᴅ:</i></b> → <i>{task.processed_bytes()}{subsize}</i>"
             if count:
-                msg += f"\n<b><i>💢Cᴏᴜɴᴛ:</i></b> {count}"
-            msg += f"\n<b><i>💥Sɪᴢᴇ:</i></b> {task.size()}"
-            msg += f"\n<b><i>🚀Sᴘᴇᴇᴅ:</i></b> {task.speed()}"
-            msg += f"\n<b><i>✨Esᴛɪᴍᴀᴛᴇᴅ:</i></b> {task.eta()}"
+                msg += f"\n<b><i>💢Cᴏᴜɴᴛ:</i></b> → <b>{count}</b>"
+            msg += f"\n<b><i>💥Sɪᴢᴇ:</i></b> → <i>{task.size()}</i>"
+            msg += f"\n<b><i>🚀Sᴘᴇᴇᴅ:</i></b> → <i>{task.speed()}</i>"
+            msg += f"\n<b><i>✨Esᴛɪᴍᴀᴛᴇᴅ:</i></b> <i>{task.eta()}</i>"
             if (
                 tstatus == MirrorStatus.STATUS_DOWNLOAD and task.listener.is_torrent
             ) or task.listener.is_qbit:
@@ -254,11 +254,11 @@ async def get_readable_message(sid, is_user, page_no=1, status="All", page_step=
                 msg += "\n<b><i>📤 Oᴜᴛ Mᴏᴅᴇ</i></b> → <i>Unknown</i>"
         elif tstatus == MirrorStatus.STATUS_SEED:
             msg += f"\n<b><i>📶 Sᴛᴀᴛᴜs</i></b> → <b>{tstatus}</b>"
-            msg += f"\n<b><i>💥Sɪᴢᴇ: </i></b>{task.size()}"
-            msg += f"\n<b><i>🚀Sᴘᴇᴇᴅ: </i></b>{task.seed_speed()}"
-            msg += f"\n<b><i>🚧Uᴘʟᴏᴀᴅᴇᴅ: </i></b>{task.uploaded_bytes()}"
-            msg += f"\n<b><i>🛑Rᴀᴛɪᴏ: </i></b>{task.ratio()}"
-            msg += f" | <b><i>💫Tɪᴍᴇ: </i></b>{task.seeding_time()}"
+            msg += f"\n<b><i>💥Sɪᴢᴇ: </i></b> → <i>{task.size()}</i>"
+            msg += f"\n<b><i>🚀Sᴘᴇᴇᴅ: </i></b> → <i>{task.seed_speed()}</i>"
+            msg += f"\n<b><i>🚧Uᴘʟᴏᴀᴅᴇᴅ: </i></b> → <i>{task.uploaded_bytes()}</i>"
+            msg += f"\n<b><i>🛑Rᴀᴛɪᴏ: </i></b> → <i>{task.ratio()}</i>"
+            msg += f" | <b><i>💫Tɪᴍᴇ: </i></b> → <i>{task.seeding_time()}</i>"
             try:
                 msg += f"\n<b><i>📥 Iɴ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[0]}</i>"
                 msg += (
@@ -269,7 +269,7 @@ async def get_readable_message(sid, is_user, page_no=1, status="All", page_step=
                 msg += "\n<b><i>📤 Oᴜᴛ Mᴏᴅᴇ</i></b> → <i>Unknown</i>"
         else:
             msg += f"\n<b><i>📶 Sᴛᴀᴛᴜs</i></b> → <b>{tstatus}</b>"
-            msg += f"\n<b><i>💥Sɪᴢᴇ: </i></b>{task.size()}"
+            msg += f"\n<b><i>💥Sɪᴢᴇ: </i></b> → <i>{task.size()} </i>"
             try:
                 msg += f"\n<b><i>📥 Iɴ Mᴏᴅᴇ</i></b> → <i>{task.listener.mode[0]}</i>"
                 msg += (
