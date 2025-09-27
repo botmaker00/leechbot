@@ -213,7 +213,7 @@ async def get_readable_message(sid, is_user, page_no=1, status="All", page_step=
         else:
             tstatus = task.status()
         msg += f"<b>{index + start_position}. </b>"
-        msg += f"<b><i><code>{escape(f'{task.name()}')}</code></i></b>"
+        msg += f"<code>{escape(f'<b><i>{task.name()}</i></b>')}</code>"
         if task.listener.subname:
             msg += f"\n<i>{task.listener.subname}</i>"
         msg += f"\n<b>Task By {source(task.listener)}</b>"
@@ -310,6 +310,6 @@ async def get_readable_message(sid, is_user, page_no=1, status="All", page_step=
             if status_value != status:
                 buttons.data_button(label, f"💢sᴛᴀᴛᴜs {sid} st {status_value}")
     button = buttons.build_menu(8)
-    msg += f"┟ <b><i>🌡️ᴄᴘᴜ:</i></b> {cpu_percent()}% | <b><i>✨ғʀᴇᴇ:</i></b> {get_readable_file_size(disk_usage(DOWNLOAD_DIR).free)}"
+    msg += f"\n┟ <b><i>🌡️ᴄᴘᴜ:</i></b> {cpu_percent()}% | <b><i>✨ғʀᴇᴇ:</i></b> {get_readable_file_size(disk_usage(DOWNLOAD_DIR).free)}"
     msg += f"\n┖ <b><i>💻ʀᴀᴍ:</i></b> {virtual_memory().percent}% | <b><i>⛩️ᴜᴘᴛɪᴍᴇ:<i></b> {get_readable_time(time() - bot_start_time)}"
     return msg, button
