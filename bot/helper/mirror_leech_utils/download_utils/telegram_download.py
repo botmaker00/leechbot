@@ -117,22 +117,22 @@ class TelegramDownloadHelper:
             )
             create_task(auto_delete_message(error_msg, time=300))  # noqa: RUF006
 
-    async def _on_download_complete(self):
-        global LOGGER  # Ensure LOGGER is treated as global
-        async with global_lock:
-            # Safely remove ID from GLOBAL_GID if it exists
-            GLOBAL_GID.discard(self._id)
+async def _on_download_complete(self):
+    global LOGGER
+    async with global_lock:
+        GLOBAL_GID.discard(self._id)
+    try:
+        LOGGER.info(">>> Entering download_complete, calling listener...")
+        await self._listener.on_download_complete()
+    except Exception as e:
+        # Ye line full traceback print karega
+        LOGGER.error(f"Error in download complete handler: {e}", exc_info=True)
         try:
-            await self._listener.on_download_complete()
-        except Exception as e:
-            LOGGER.error(f"Error in download complete handler: {e}")
-            # Try to handle the error gracefully
-            try:
-                await self._listener.on_download_error(
-                    f"Post-download processing error: {e}"
-                )
-            except Exception as inner_e:
-                LOGGER.error(f"Failed to handle download complete error: {inner_e}")
+            await self._listener.on_download_error(
+                f"Post-download processing error: {e}"
+            )
+        except Exception as inner_e:
+            LOGGER.error(f"Failed to handle download complete error: {inner_e}")
 
     async def _download(self, message, path):
         global LOGGER  # Ensure LOGGER is treated as global
