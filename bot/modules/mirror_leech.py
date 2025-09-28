@@ -963,8 +963,7 @@ class Mirror(TaskListener):
     await delete_links(self.message)
     return await auto_delete_message(x, time=300)
 
-# 👇 Ye block add karo iske turant baad
-elif is_telegram_link(self.link):
+elif is_telegram_link(self.link):   # 👈 SAME indentation as 'if'
     from bot.helper.mirror_leech_utils.telegram_download import TelegramDownloadHelper
 
     tg_dl = TelegramDownloadHelper(self)   # self = listener
