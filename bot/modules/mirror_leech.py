@@ -938,31 +938,38 @@ class Mirror(TaskListener):
             pass
 
         if (
-            (not self.link and file_ is None)
-            or (is_telegram_link(self.link) and reply_to is None)
-            or (
-                file_ is None
-                and not is_url(self.link)
-                and not is_magnet(self.link)
-                and not await aiopath.exists(self.link)
-                and not is_rclone_path(self.link)
-                and not is_gdrive_id(self.link)
-                and not is_gdrive_link(self.link)
-                and not is_mega_link(self.link)
-                and not (
-                    Config.STREAMRIP_ENABLED and await is_streamrip_url(self.link)
-                )
-            )
-        ):
-            x = await send_message(
-                self.message,
-                COMMAND_USAGE["mirror"][0],
-                COMMAND_USAGE["mirror"][1],
-            )
-            await self.remove_from_same_dir()
-            await delete_links(self.message)
-            return await auto_delete_message(x, time=300)
+    (not self.link and file_ is None)
+    or (is_telegram_link(self.link) and reply_to is None)
+    or (
+        file_ is None
+        and not is_url(self.link)
+        and not is_magnet(self.link)
+        and not await aiopath.exists(self.link)
+        and not is_rclone_path(self.link)
+        and not is_gdrive_id(self.link)
+        and not is_gdrive_link(self.link)
+        and not is_mega_link(self.link)
+        and not (
+            Config.STREAMRIP_ENABLED and await is_streamrip_url(self.link)
+        )
+    )
+):
+    x = await send_message(
+        self.message,
+        COMMAND_USAGE["mirror"][0],
+        COMMAND_USAGE["mirror"][1],
+    )
+    await self.remove_from_same_dir()
+    await delete_links(self.message)
+    return await auto_delete_message(x, time=300)
 
+# 👇 Ye block add karo iske turant baad
+elif is_telegram_link(self.link):
+    from bot.helper.mirror_leech_utils.telegram_download import TelegramDownloadHelper
+
+    tg_dl = TelegramDownloadHelper(self)   # self = listener
+    create_task(tg_dl.add_download(reply_to, f"{self.dir}/", None))
+    return
         # Mega links are now supported natively, no need to force JDownloader
 
         # Check if media tools flag is set
