@@ -1,3 +1,5 @@
+import os
+
 from asyncio import Lock, create_task, sleep
 from secrets import token_hex
 from time import time
