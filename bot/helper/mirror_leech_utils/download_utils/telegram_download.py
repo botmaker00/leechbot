@@ -28,6 +28,7 @@ except ImportError:
     LOGGER = getLogger(__name__)
     task_dict = {}
     task_dict_lock = Lock()
+
 from bot.core.aeon_client import TgClient
 from bot.core.config_manager import Config
 from bot.helper.ext_utils.hyperdl_utils import HyperTGDownload
@@ -70,12 +71,11 @@ class TelegramDownloadHelper:
         return self._processed_bytes
 
     async def _on_download_start(self, file_id, from_queue):
-        global LOGGER  # Ensure LOGGER is treated as global
+        global LOGGER
         async with global_lock:
             GLOBAL_GID.add(file_id)
         self._id = file_id
         async with task_dict_lock:
-            # Convert file_id to string before slicing
             file_id_str = str(file_id)
             task_dict[self._listener.mid] = TelegramStatus(
                 self._listener,
@@ -89,13 +89,10 @@ class TelegramDownloadHelper:
                 await send_status_message(self._listener.message)
             LOGGER.info(f"Download from Telegram: {self._listener.name}")
         else:
-            LOGGER.info(
-                f"Start Queued Download from Telegram: {self._listener.name}",
-            )
+            LOGGER.info(f"Start Queued Download from Telegram: {self._listener.name}")
 
     async def _on_download_progress(self, current, total=None):
         if self._listener.is_cancelled:
-            # Handle different client implementations
             if hasattr(self.session, "stop_transmission"):
                 self.session.stop_transmission()
             elif hasattr(self.session, "cancel"):
@@ -103,43 +100,40 @@ class TelegramDownloadHelper:
         self._processed_bytes = current
 
     async def _on_download_error(self, error):
-        global LOGGER  # Ensure LOGGER is treated as global
+        global LOGGER
         async with global_lock:
             GLOBAL_GID.discard(self._id)
         try:
             await self._listener.on_download_error(error)
         except Exception as e:
             LOGGER.error(f"Failed to handle error through listener: {e!s}")
-            # Fallback error handling
             error_msg = await send_message(
                 self._listener.message,
                 f"{self._listener.tag} {error}",
             )
-            create_task(auto_delete_message(error_msg, time=300))  # noqa: RUF006
+            create_task(auto_delete_message(error_msg, time=300))
 
-async def _on_download_complete(self):
-    global LOGGER
-    async with global_lock:
-        GLOBAL_GID.discard(self._id)
-    try:
-        LOGGER.info(">>> Entering download_complete, calling listener...")
-        await self._listener.on_download_complete()
-    except Exception as e:
-        # Ye line full traceback print karega
-        LOGGER.error(f"Error in download complete handler: {e}", exc_info=True)
+    async def _on_download_complete(self):
+        global LOGGER
+        async with global_lock:
+            GLOBAL_GID.discard(self._id)
         try:
-            await self._listener.on_download_error(
-                f"Post-download processing error: {e}"
-            )
-        except Exception as inner_e:
-            LOGGER.error(f"Failed to handle download complete error: {inner_e}")
+            LOGGER.info(">>> Entering download_complete, calling listener...")
+            await self._listener.on_download_complete()
+        except Exception as e:
+            LOGGER.error(f"Error in download complete handler: {e}", exc_info=True)
+            try:
+                await self._listener.on_download_error(
+                    f"Post-download processing error: {e}"
+                )
+            except Exception as inner_e:
+                LOGGER.error(f"Failed to handle download complete error: {inner_e}")
 
     async def _download(self, message, path):
-        global LOGGER  # Ensure LOGGER is treated as global
+        global LOGGER
         try:
             if self._hyper_dl:
                 try:
-                    # First check if the message has downloadable media
                     media = (
                         message.document
                         or message.photo
@@ -153,9 +147,7 @@ async def _on_download_complete(self):
                     )
 
                     if not media:
-                        raise ValueError(
-                            "Message doesn't contain any downloadable media"
-                        )
+                        raise ValueError("Message doesn't contain any downloadable media")
 
                     download = await HyperTGDownload().download_media(
                         message,
@@ -165,14 +157,12 @@ async def _on_download_complete(self):
                     )
 
                 except ValueError:
-                    # This is a configuration or media error, fall back to normal download
                     self._hyper_dl = False
                     download = await message.download(
                         file_name=path,
                         progress=self._on_download_progress,
                     )
                 except Exception:
-                    # This is an unexpected error, fall back to normal download
                     download = await message.download(
                         file_name=path,
                         progress=self._on_download_progress,
@@ -190,8 +180,7 @@ async def _on_download_complete(self):
             await self._download(message, path)
             return
         except OSError as e:
-            # Check specifically for "No space left on device" error
-            if e.errno == 28:  # errno 28 is "No space left on device"
+            if e.errno == 28:  # No space left on device
                 error_msg = "No space left on device. Please free up some disk space and try again."
                 LOGGER.error(f"{error_msg} Path: {path}")
                 await self._on_download_error(error_msg)
@@ -203,23 +192,21 @@ async def _on_download_complete(self):
             LOGGER.error(str(e))
             await self._on_download_error(str(e))
             return
+
         if download is not None:
             try:
                 await self._on_download_complete()
             except Exception as e:
                 LOGGER.error(f"Critical error in download complete: {e}")
-                # Ensure we don't leave the task in an inconsistent state
                 try:
                     await self._on_download_error(f"Download completion failed: {e}")
                 except Exception as inner_e:
-                    LOGGER.error(
-                        f"Failed to handle critical download error: {inner_e}"
-                    )
+                    LOGGER.error(f"Failed to handle critical download error: {inner_e}")
         elif not self._listener.is_cancelled:
             await self._on_download_error("Internal error occurred")
 
     async def add_download(self, message, path, session):
-        global LOGGER  # Ensure LOGGER is treated as global
+        global LOGGER
         self.session = session
         if not self.session:
             if self._hyper_dl:
@@ -232,19 +219,16 @@ async def _on_download_complete(self):
             ):
                 self.session = TgClient.user
                 try:
-                    # Get the message by its ID with Electrogram compatibility
                     try:
                         message = await self.session.get_messages(
                             chat_id=message.chat.id,
                             message_ids=message.id,
                         )
                     except TypeError as e:
-                        # Handle case where get_messages has different parameters in Electrogram
                         if "unexpected keyword argument" in str(e):
-                            # Try alternative approach for Electrogram
                             message = await self.session.get_messages(
-                                message.chat.id,  # chat_id as positional argument
-                                message.id,  # message_ids as positional argument
+                                message.chat.id,
+                                message.id,
                             )
                         else:
                             raise
@@ -256,19 +240,16 @@ async def _on_download_complete(self):
             else:
                 self.session = TgClient.bot
         elif self.session != TgClient.bot:
-            # Get the message by its ID with Electrogram compatibility
             try:
                 message = await self.session.get_messages(
                     chat_id=message.chat.id,
                     message_ids=message.id,
                 )
             except TypeError as e:
-                # Handle case where get_messages has different parameters in Electrogram
                 if "unexpected keyword argument" in str(e):
-                    # Try alternative approach for Electrogram
                     message = await self.session.get_messages(
-                        message.chat.id,  # chat_id as positional argument
-                        message.id,  # message_ids as positional argument
+                        message.chat.id,
+                        message.id,
                     )
                 else:
                     raise
@@ -304,7 +285,6 @@ async def _on_download_complete(self):
                 self._listener.size = media.file_size
                 gid = token_hex(4)
 
-                # Check size limits
                 if self._listener.size > 0:
                     limit_msg = await limit_checker(
                         self._listener.size,
@@ -337,17 +317,15 @@ async def _on_download_complete(self):
                     await event.wait()
                     if self._listener.is_cancelled:
                         async with global_lock:
-                            # Safely remove ID from GLOBAL_GID if it exists
                             if self._id in GLOBAL_GID:
                                 GLOBAL_GID.remove(self._id)
-                            elif self._id:  # Only log if _id is not empty
+                            elif self._id:
                                 pass
                             return
 
                 self._start_time = time()
                 await self._on_download_start(gid, add_to_queue)
 
-                # Check if helper bots are available and LEECH_DUMP_CHAT is set before starting download
                 if self._hyper_dl and (
                     not TgClient.are_helper_bots_available()
                     or not Config.LEECH_DUMP_CHAT
@@ -366,3 +344,13 @@ async def _on_download_complete(self):
     async def cancel_task(self):
         self._listener.is_cancelled = True
         await self._on_download_error("Stopped by user!")
+
+
+# ✅ Wrapper function for uniform interface
+async def add_telegram_download(listener, message, path, session=None):
+    """
+    Wrapper to start a Telegram download just like other add_*_download functions.
+    """
+    tg_dl = TelegramDownloadHelper(listener)
+    await tg_dl.add_download(message, path, session)
+    return tg_dl
