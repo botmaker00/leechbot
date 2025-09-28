@@ -169,7 +169,7 @@ async def is_video_file(file_path):
         file_path,
     ]
 
-    stdout, stderr, return_code = await cmd_exec(cmd)
+    stdout, _stderr, return_code = await cmd_exec(cmd)
 
     if return_code == 0:
         try:
@@ -211,7 +211,7 @@ async def get_audio_streams(file_path):
         file_path,
     ]
 
-    stdout, stderr, return_code = await cmd_exec(cmd)
+    stdout, _stderr, return_code = await cmd_exec(cmd)
 
     if return_code == 0:
         try:
@@ -267,7 +267,7 @@ async def get_audio_info_for_display(file_path):
         file_path,
     ]
 
-    stdout, stderr, return_code = await cmd_exec(cmd)
+    stdout, _stderr, return_code = await cmd_exec(cmd)
 
     if return_code == 0:
         try:
@@ -377,7 +377,7 @@ async def extract_audio_from_video(
             "xtra command failed for audio extraction, trying with ffmpeg as fallback"
         )
         cmd[0] = "ffmpeg"
-        stdout, stderr, return_code = await cmd_exec(cmd)
+        _stdout, stderr, return_code = await cmd_exec(cmd)
 
     if return_code == 0:
         LOGGER.info(f"Audio extraction successful: {output_file}")
@@ -456,7 +456,7 @@ async def convert_to_compatible_format(
             "xtra command failed for conversion, trying with ffmpeg as fallback"
         )
         cmd[0] = "ffmpeg"
-        stdout, stderr, return_code = await cmd_exec(cmd)
+        _stdout, stderr, return_code = await cmd_exec(cmd)
 
     if return_code == 0:
         LOGGER.info("Conversion to FLAC successful")

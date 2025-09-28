@@ -480,13 +480,13 @@ async def generate_caption(
         if re.match(r"(.+)(\.\w+)(\.\d{3})$", filename):
             # For .ext.001 files: name.ext.001 -> name, ext (without dot), 001
             match = re.match(r"(.+)(\.\w+)(\.\d{3})$", filename)
-            base_name, ext_with_dot, split_num = match.groups()
+            base_name, ext_with_dot, _split_num = match.groups()
             filename_with_prefix_suffix = base_name
             ext_without_dot = ext_with_dot[1:]  # Remove dot from extension
         elif re.match(r"(.+)(\.part\d+)(\..+)$", filename):
             # For .part001.ext files: name.part001.ext -> name, ext (without dot)
             match = re.match(r"(.+)(\.part\d+)(\..+)$", filename)
-            base_name, part_num, ext_with_dot = match.groups()
+            base_name, _part_num, ext_with_dot = match.groups()
             filename_with_prefix_suffix = base_name
             ext_without_dot = ext_with_dot[1:]  # Remove dot from extension
         else:

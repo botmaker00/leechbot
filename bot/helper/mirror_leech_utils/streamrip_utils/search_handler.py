@@ -1785,7 +1785,7 @@ async def _cleanup_inactive_clients():
         cache_key = f"{platform_name}_client"
         if cache_key in STREAMRIP_CLIENT_CACHE:
             try:
-                cached_time, cached_client = STREAMRIP_CLIENT_CACHE[cache_key]
+                _cached_time, cached_client = STREAMRIP_CLIENT_CACHE[cache_key]
                 # Clean up client session
                 if (
                     hasattr(cached_client, "session")
@@ -1898,7 +1898,7 @@ async def _get_or_create_cached_client(platform_name, config):
                     STREAMRIP_CLIENT_CACHE.keys(),
                     key=lambda k: STREAMRIP_CLIENT_CACHE[k][0],
                 )
-                old_time, old_client = STREAMRIP_CLIENT_CACHE[oldest_key]
+                _old_time, old_client = STREAMRIP_CLIENT_CACHE[oldest_key]
                 # Clean up old client session
                 if (
                     hasattr(old_client, "session")

@@ -12356,7 +12356,7 @@ class TaskConfig:
                             continue
 
                         # Generate add command for this file
-                        cmd, temp_file = await get_add_cmd(
+                        cmd, _temp_file = await get_add_cmd(
                             file_path=file_path,
                             add_video=self.add_video_enabled,
                             add_audio=self.add_audio_enabled,

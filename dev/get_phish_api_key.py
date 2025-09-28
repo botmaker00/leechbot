@@ -250,7 +250,7 @@ async def get_api_key():
 
             if choice == "1":
                 # Signup flow
-                email, password, signup_result = await signup_user(client, headers)
+                email, password, _signup_result = await signup_user(client, headers)
                 if not email:
                     return
 

@@ -77,7 +77,7 @@ async def generate_video_thumbnail(video_path):
         process = await create_subprocess_exec(
             *cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
         )
-        stdout, stderr = await process.communicate()
+        _stdout, stderr = await process.communicate()
 
         if process.returncode == 0 and ospath.exists(thumbnail_path):
             return thumbnail_path
@@ -509,7 +509,7 @@ async def add_mega_upload(listener, path):
 
     # Detect account type and get optimized settings
     try:
-        is_premium, premium_settings = await _detect_mega_account_type(api)
+        _is_premium, _premium_settings = await _detect_mega_account_type(api)
     except Exception as e:
         LOGGER.warning(
             f"Could not detect account type: {e}, using free account settings"

@@ -82,7 +82,7 @@ class RawByteStreamer:
             return self.cached_file_properties[message_id]
 
         # Get optimal client for file property retrieval
-        client, client_id = self._get_optimal_client()
+        client, _client_id = self._get_optimal_client()
 
         try:
             # Get message from storage channel
@@ -357,7 +357,7 @@ class RawByteStreamer:
         """Get message from storage channel (for web server compatibility)"""
         try:
             # Get optimal client for message retrieval
-            client, client_id = self._get_optimal_client()
+            client, _client_id = self._get_optimal_client()
             message = await client.get_messages(self.chat_id, message_id)
 
             if not message or not message.media:

@@ -2090,7 +2090,7 @@ async def get_metadata_cmd(
 
         # Get media information if it's a media file
         try:
-            duration, artist, title = await get_media_info(file_path)
+            duration, _artist, title = await get_media_info(file_path)
             if duration and duration > 0:
                 hours = duration // 3600
                 minutes = (duration % 3600) // 60
@@ -9986,7 +9986,7 @@ async def get_remove_cmd(
 
     # Get file info
     file_name = os.path.basename(file_path)
-    name, ext = os.path.splitext(file_name)
+    _name, ext = os.path.splitext(file_name)
 
     # Determine output format based on settings and content
     output_ext = ext

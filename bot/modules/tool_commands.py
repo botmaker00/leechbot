@@ -370,7 +370,7 @@ async def create_sticker_from_media(
             process = await asyncio.create_subprocess_exec(
                 *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
             )
-            stdout, stderr = await process.communicate()
+            _stdout, _stderr = await process.communicate()
 
             if process.returncode != 0:
                 # Try fallback with different settings
@@ -497,7 +497,7 @@ async def create_animated_sticker_fallback(
         process = await asyncio.create_subprocess_exec(
             *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
         )
-        stdout, stderr = await process.communicate()
+        _stdout, _stderr = await process.communicate()
 
         if process.returncode != 0:
             return False, duration_info
@@ -628,7 +628,7 @@ async def convert_video_to_video_note(input_path: str, output_path: str) -> bool
     """Convert video to Telegram video note format (circular video like native recording)."""
     try:
         # Get video info
-        duration, width, height = await get_media_info(input_path)
+        _duration, _width, _height = await get_media_info(input_path)
 
         # Telegram video notes requirements for circular appearance:
         # - Must be exactly square (1:1 aspect ratio)
@@ -679,7 +679,7 @@ async def convert_video_to_video_note(input_path: str, output_path: str) -> bool
         process = await asyncio.create_subprocess_exec(
             *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
         )
-        stdout, stderr = await process.communicate()
+        _stdout, _stderr = await process.communicate()
 
         if process.returncode != 0:
             # Fallback to simple approach

@@ -1399,7 +1399,7 @@ class EnhancedNSFWDetector:
                 "-",
             ]
 
-            stdout, stderr, code = await cmd_exec(cmd)
+            stdout, _stderr, code = await cmd_exec(cmd)
 
             if code == 0 and stdout:
                 # Parse metadata and extract text fields

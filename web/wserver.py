@@ -836,16 +836,16 @@ async def health_check():
         # Get stream utilities
         (
             StreamClientManager,
-            ByteStreamer,
-            ParallelByteStreamer,
-            ParallelDownloader,
-            RawByteStreamer,
-            create_raw_streamer,
-            get_hash,
-            get_fname,
-            validate_stream_request,
-            get_mime_type,
-            is_streamable_file,
+            _ByteStreamer,
+            _ParallelByteStreamer,
+            _ParallelDownloader,
+            _RawByteStreamer,
+            _create_raw_streamer,
+            _get_hash,
+            _get_fname,
+            _validate_stream_request,
+            _get_mime_type,
+            _is_streamable_file,
         ) = get_stream_utils()
 
         # Check if File2Link is enabled
@@ -857,7 +857,7 @@ async def health_check():
             }
 
         # Check if bot client is available
-        client, client_id = StreamClientManager.get_optimal_client()
+        client, _client_id = StreamClientManager.get_optimal_client()
         bot_ready = client is not None
 
         # Check configuration
@@ -945,17 +945,17 @@ def parse_stream_request(path: str) -> tuple[int, str]:
     """Parse streaming request path to extract message ID and hash"""
     # Get stream utilities
     (
-        StreamClientManager,
-        ByteStreamer,
-        ParallelByteStreamer,
-        ParallelDownloader,
-        RawByteStreamer,
-        create_raw_streamer,
-        get_hash,
-        get_fname,
+        _StreamClientManager,
+        _ByteStreamer,
+        _ParallelByteStreamer,
+        _ParallelDownloader,
+        _RawByteStreamer,
+        _create_raw_streamer,
+        _get_hash,
+        _get_fname,
         validate_stream_request,
-        get_mime_type,
-        is_streamable_file,
+        _get_mime_type,
+        _is_streamable_file,
     ) = get_stream_utils()
 
     match = PATTERN_HASH_FIRST.match(path)
@@ -1001,12 +1001,12 @@ async def stream_preview(path: str, request: Request):
             StreamClientManager,
             ByteStreamer,
             ParallelByteStreamer,
-            ParallelDownloader,
+            _ParallelDownloader,
             RawByteStreamer,
             create_raw_streamer,
             get_hash,
-            get_fname,
-            validate_stream_request,
+            _get_fname,
+            _validate_stream_request,
             get_mime_type,
             is_streamable_file,
         ) = get_stream_utils()
@@ -1229,16 +1229,16 @@ async def download_file(path: str, request: Request):
         # Get stream utilities
         (
             StreamClientManager,
-            ByteStreamer,
-            ParallelByteStreamer,
-            ParallelDownloader,
+            _ByteStreamer,
+            _ParallelByteStreamer,
+            _ParallelDownloader,
             RawByteStreamer,
             create_raw_streamer,
             get_hash,
             get_fname,
             validate_stream_request,
             get_mime_type,
-            is_streamable_file,
+            _is_streamable_file,
         ) = get_stream_utils()
 
         # Parse path first
