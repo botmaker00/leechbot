@@ -1,4 +1,3 @@
-import os  # ✅ Added missing import
 from asyncio import Lock, create_task, sleep
 from secrets import token_hex
 from time import time
@@ -10,9 +9,11 @@ except ImportError:
     # FloodPremiumWait not available in pyrofork 2.2.11
     try:
         from pyrogram.errors import FloodWait, StopTransmissionError
+
         FloodPremiumWait = FloodWait  # Use FloodWait as fallback
     except ImportError:
         from pyrogram.errors import FloodWait
+
         FloodPremiumWait = FloodWait  # Use FloodWait as fallback
         StopTransmissionError = None
 
@@ -84,7 +85,9 @@ class TelegramDownloadHelper:
                 await send_status_message(self._listener.message)
             LOGGER.info(f"Download from Telegram: {self._listener.name}")
         else:
-            LOGGER.info(f"Start Queued Download from Telegram: {self._listener.name}")
+            LOGGER.info(
+                f"Start Queued Download from Telegram: {self._listener.name}"
+            )
 
     async def _on_download_progress(self, current, total=None):
         if self._listener.is_cancelled:
@@ -139,7 +142,9 @@ class TelegramDownloadHelper:
                         or None
                     )
                     if not media:
-                        raise ValueError("Message doesn't contain any downloadable media")
+                        raise ValueError(
+                            "Message doesn't contain any downloadable media"
+                        )
 
                     download = await HyperTGDownload().download_media(
                         message,
@@ -171,9 +176,7 @@ class TelegramDownloadHelper:
             return
         except OSError as e:
             if e.errno == 28:  # No space left on device
-                error_msg = (
-                    "No space left on device. Please free up some disk space and try again."
-                )
+                error_msg = "No space left on device. Please free up some disk space and try again."
                 LOGGER.error(f"{error_msg} Path: {path}")
                 await self._on_download_error(error_msg)
             else:
@@ -193,7 +196,9 @@ class TelegramDownloadHelper:
                 try:
                     await self._on_download_error(f"Download completion failed: {e}")
                 except Exception as inner_e:
-                    LOGGER.error(f"Failed to handle critical download error: {inner_e}")
+                    LOGGER.error(
+                        f"Failed to handle critical download error: {inner_e}"
+                    )
         elif not self._listener.is_cancelled:
             await self._on_download_error("Internal error occurred")
 
