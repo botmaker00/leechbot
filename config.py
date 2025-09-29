@@ -1,11 +1,11 @@
 # REQUIRED CONFIG
-BOT_TOKEN = ""  # Get this from @BotFather
-OWNER_ID = 0  # Your Telegram User ID (not username) as an integer
-TELEGRAM_API = 0  # Get this from my.telegram.org
-TELEGRAM_HASH = ""  # Get this from my.telegram.org
+BOT_TOKEN = "7552035888:AAHC4Ikvo_t3hxtOY0tOC3aByUmK3bQfu0Q"  # Get this from @BotFather
+OWNER_ID = 5741918628  # Your Telegram User ID (not username) as an integer
+TELEGRAM_API = 21518327  # Get this from my.telegram.org
+TELEGRAM_HASH = "e72f588b3e4763f01eecfc3c4aa7e8ac"  # Get this from my.telegram.org
 
 # SEMI-REQUIRED, WE SUGGEST TO FILL IT FROM MONGODB
-DATABASE_URL = ""  # MongoDB URI for storing user data and preferences
+DATABASE_URL = "mongodb+srv://remleech:remleech@remleech.n2pttzf.mongodb.net/?retryWrites=true&w=majority&appName=remleech"  # MongoDB URI for storing user >
 
 # Heroku config for get BASE_URL automatically
 HEROKU_APP_NAME = ""
@@ -23,12 +23,12 @@ AUTO_REDEPLOY = False  # Enable/disable automatic redeployment on schedule
 REDEPLOY_INTERVAL_DAYS = 7  # Auto redeploy interval in days (1, 3, 7, 14, or 30)
 
 # Update
-UPSTREAM_REPO = "https://github.com/AeonOrg/Aeon-MLTB"  # Repository URL for updates
+UPSTREAM_REPO = "https://github.com/botmaker00/leechbot"  # Repository URL for updates
 UPSTREAM_BRANCH = "extended"  # Branch to use for updates
 
 # Branding Settings
-CREDIT = "Powered by @aimmirror"  # Credit text shown in status messages and RSS feeds (default: "Powered by @aimmirror")
-OWNER_THUMB = "https://graph.org/file/80b7fb095063a18f9e232.jpg"  # Default thumbnail URL for owner (accepts Telegram file links)
+CREDIT = "Powered by @Animeworld_zone"  # Credit text shown in status messages and RSS feeds (default: "Powered by @aimmirror")
+OWNER_THUMB = "https://graph.org/Animeworld-zone-09-11-3"  # Default thumbnail URL for owner (accepts Telegram file links)
 
 # Telegram
 USER_SESSION_STRING = ""  # Pyrogram user session string for mirror/leech authentication
