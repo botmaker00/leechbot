@@ -263,13 +263,13 @@ EQUAL_SPLITS = False  # Create equal-sized parts when splitting files
 
 # qBittorrent/Aria2c
 TORRENT_TIMEOUT = 0  # Timeout for torrent downloads in seconds (0 = no timeout)
-BASE_URL = ""  # Base URL for web server
-BASE_URL_PORT = 80  # Port for web server (0 to disable)
+BASE_URL = "http://161.118.179.19:7979"  # Base URL for web server
+BASE_URL_PORT = 7979  # Port for web server (0 to disable)
 WEB_PINCODE = False  # Enable pincode protection for web server
 
 # File2Link Settings
 FILE2LINK_ENABLED = True  # Enable File2Link functionality
-FILE2LINK_BASE_URL = ""  # Dedicated base URL for File2Link streaming (optional, uses BASE_URL if not set)
+FILE2LINK_BASE_URL = "http://161.118.179.19:7979"  # Dedicated base URL for File2Link streaming (optional, uses BASE_URL if not set)
 FILE2LINK_BIN_CHANNEL = 0  # REQUIRED: Private channel ID to store files for streaming (e.g., -1001234567890)
 FILE2LINK_ALLOWED_TYPES = "video,audio,document,photo,animation,voice,video_note"  # Allowed media types for streaming
 
