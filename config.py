@@ -263,8 +263,8 @@ EQUAL_SPLITS = False  # Create equal-sized parts when splitting files
 
 # qBittorrent/Aria2c
 TORRENT_TIMEOUT = 0  # Timeout for torrent downloads in seconds (0 = no timeout)
-BASE_URL = "http://161.118.179.19:7979"  # Base URL for web server
-BASE_URL_PORT = 7979  # Port for web server (0 to disable)
+BASE_URL = "http://161.118.179.19:8181"  # Base URL for web server
+BASE_URL_PORT = 8181  # Port for web server (0 to disable)
 WEB_PINCODE = False  # Enable pincode protection for web server
 
 # File2Link Settings
