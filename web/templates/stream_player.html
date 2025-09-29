@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ file_name }} - File2Link</title>
+
+    <!-- Plyr CSS -->
+    <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css">
+
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f8f9fa;
+            color: #212529;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .header h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #495057;
+            margin-bottom: 0.5rem;
+        }
+
+        .file-info {
+            font-size: 0.9rem;
+            color: #6c757d;
+        }
+
+        .player-wrapper {
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+            overflow: hidden;
+        }
+
+        .plyr {
+            border-radius: 0;
+        }
+
+        .controls {
+            display: flex;
+            gap: 0.75rem;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 2rem;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.25rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #0056b3;
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #545b62;
+            transform: translateY(-1px);
+        }
+
+        .btn i {
+            font-size: 1rem;
+        }
+
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #28a745;
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 1000;
+            display: none;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        .footer {
+            text-align: center;
+            padding: 2rem 0;
+            color: #6c757d;
+            font-size: 0.85rem;
+        }
+
+        /* Mobile optimizations */
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+
+            .header h1 {
+                font-size: 1.25rem;
+            }
+
+            .controls {
+                gap: 0.5rem;
+            }
+
+            .btn {
+                padding: 0.6rem 1rem;
+                font-size: 0.85rem;
+            }
+
+            .toast {
+                right: 15px;
+                top: 15px;
+                left: 15px;
+                right: 15px;
+            }
+        }
+        
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>{{ file_name }}</h1>
+            <div class="file-info">File2Link Player</div>
+        </div>
+
+        <div class="player-wrapper">
+            {% if tag == "audio" %}
+            <audio id="player" controls preload="metadata" crossorigin="anonymous">
+                <source src="{{ src }}" type="audio/mpeg">
+                <source src="{{ src }}" type="audio/mp4">
+                <source src="{{ src }}" type="audio/ogg">
+                <source src="{{ src }}" type="audio/wav">
+                <source src="{{ src }}" type="audio/flac">
+                <p>Your browser does not support the audio element.</p>
+            </audio>
+            {% else %}
+            <video id="player" controls preload="metadata" crossorigin="anonymous" playsinline>
+                <source src="{{ src }}" type="video/mp4">
+                <source src="{{ src }}" type="video/webm">
+                <source src="{{ src }}" type="video/ogg">
+                <source src="{{ src }}" type="video/avi">
+                <source src="{{ src }}" type="video/mkv">
+                <p>Your browser does not support the video element.</p>
+            </video>
+            {% endif %}
+        </div>
+
+        <div class="controls">
+            <button class="btn btn-primary" onclick="downloadFile()" title="Download file">
+                <i class="fas fa-download"></i>
+                <span>Download</span>
+            </button>
+            <button class="btn btn-secondary" onclick="copyLink()" title="Copy link">
+                <i class="fas fa-link"></i>
+                <span>Copy Link</span>
+            </button>
+
+            <button class="btn btn-secondary" onclick="shareFile()" title="Share">
+                <i class="fas fa-share-alt"></i>
+                <span>Share</span>
+            </button>
+        </div>
+    </div>
+
+    <div class="footer">
+        File2Link Player
+    </div>
+
+    <div class="toast" id="toast">
+        <span id="toast-message">Action completed</span>
+    </div>
+
+    <script>
+        // Download function
+        function downloadFile() {
+            const downloadUrl = '{{ src }}'.replace('/stream/', '/download/');
+            const fullDownloadUrl = new URL(downloadUrl, window.location.origin).href;
+
+
+
+            const link = document.createElement('a');
+            link.href = fullDownloadUrl;
+            link.download = '{{ file_name }}';
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showToast('Download started');
+        }
+
+        // Copy link function
+        function copyLink() {
+            const fullUrl = new URL('{{ src }}', window.location.origin).href;
+            navigator.clipboard.writeText(fullUrl).then(() => {
+                showToast('Link copied to clipboard');
+            }).catch(() => {
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = fullUrl;
+                textArea.style.position = 'fixed';
+                textArea.style.opacity = '0';
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                showToast('Link copied to clipboard');
+            });
+        }
+
+
+
+
+
+
+        // Share function
+        function shareFile() {
+            if (navigator.share) {
+                navigator.share({
+                    title: '{{ file_name }}',
+                    url: window.location.href
+                }).then(() => showToast('Shared successfully'))
+                .catch(() => copyLink());
+            } else {
+                copyLink();
+            }
+        }
+
+        // Toast notification
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toast-message');
+            toastMessage.textContent = message;
+            toast.style.display = 'block';
+            setTimeout(() => {
+                toast.style.display = 'none';
+            }, 3000);
+        }
+
+        // Initialize Plyr
+        document.addEventListener('DOMContentLoaded', function() {
+            const player = new Plyr('#player', {
+                controls: ['play-large', 'play', 'progress', 'current-time', 'mute', 'volume', 'settings', 'fullscreen'],
+                settings: ['speed', 'quality'],
+                speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 2] }
+            });
+
+            player.on('ready', () => showToast('Player ready'));
+        });
+    </script>
+
+    <!-- Plyr JavaScript -->
+    <script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script>
+</body>
+</html>

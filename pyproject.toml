@@ -1,0 +1,69 @@
+[tool.ruff]
+fix = true
+unsafe-fixes = true
+line-length = 85
+target-version = "py313"
+
+[tool.ruff.lint]
+# Linting rule categories to enable
+select = [
+    "E",      # pycodestyle errors
+    "F",      # pyflakes
+    "I",      # isort (import sorting)
+    "W",      # pycodestyle warnings
+    "B",      # flake8-bugbear (code quality issues)
+    "N",      # pep8-naming
+    "C4",     # flake8-comprehensions
+    "UP",     # pyupgrade (modern syntax)
+    "FA",     # flake8-future-annotations
+    "PL",     # pylint rules
+    "PIE",    # flake8-pie (anti-patterns)
+    "PYI",    # flake8-pyi (type stub files)
+    "RET",    # flake8-return (return statements)
+    "RUF",    # ruff-specific rules
+    "SIM",    # flake8-simplify
+    "TCH",    # flake8-type-checking
+    "TID",    # flake8-tidy-imports
+    "ARG",    # flake8-unused-arguments
+    "C90",    # mccabe (complexity)
+    "COM",    # flake8-commas
+    "FURB",   # refurb (modern code improvements)
+    "PERF",   # perflint (performance issues)
+    "ASYNC",  # flake8-async (async-specific checks)
+]
+
+# Ignored rules (with justifications)
+ignore = [
+    "E501",     # line too long (handled by formatter like Black)
+    "F403",     # 'from module import *' used; sometimes intentional
+    "N806",     # variable in function should be lowercase
+    "N818",     # exception class names should end in 'Error'
+    "PLR09",    # pylint refactor suggestions (e.g. too many branches)
+    "SIM115",   # use contextlib.suppress instead of try/except-pass
+    "COM812",   # missing trailing comma (auto-fixed by formatter)
+    "PERF203",  # try-except inside loop (can be intentional)
+    "PLR0912",  # too many branches
+    "PLR0913",  # too many function arguments
+    "PLR0915",  # too many statements
+    "PLR2004",  # magic value used in comparison
+    "PLR1702",  # too many nested blocks
+    "PLW1514",  # using open() without explicitly specifying encoding
+    "PLW2901",  # overwriting loop variable
+]
+
+fixable = ["ALL"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 100
+
+[tool.ruff.lint.per-file-ignores]
+"!myjd/**.py" = ["N"]         # Ignore pep8-naming rules for this path
+"!sabnzbdapi/**.py" = ["N"]   # Ignore pep8-naming rules for this path
+
+[tool.ty]
+respect-ignore-files = false
+
+[tool.ty.rules]
+possibly-unresolved-reference = "warn"
+division-by-zero = "ignore"
+possibly-unbound-attribute = "ignore"

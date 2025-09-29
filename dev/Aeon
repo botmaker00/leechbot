@@ -1,0 +1,290 @@
+#!/bin/bash
+# Aeon
+
+set -euo pipefail
+
+export DEBIAN_FRONTEND=noninteractive
+
+TEMP_DIR=$(mktemp -d)
+JDOWNLOADER_HOME="/JDownloader"
+BIN_DIR="/usr/local/bin"
+
+download_files() {
+    mkdir -p "$JDOWNLOADER_HOME" "$BIN_DIR"
+    local arch=$(uname -m)
+    
+    if [ "$arch" = "x86_64" ]; then
+        wget -qO "$BIN_DIR/xnox" "https://github.com/userdocs/qbittorrent-nox-static/releases/latest/download/x86_64-qbittorrent-nox" &
+        wget -qO "$TEMP_DIR/ffmpeg.tar.xz" "https://github.com/5hojib/FFmpeg-Builds/releases/download/latest/ffmpeg-n7.1-latest-linux64-gpl-7.1.tar.xz" &
+        wget -qO "$TEMP_DIR/uv.tar.gz" "https://github.com/astral-sh/uv/releases/latest/download/uv-x86_64-unknown-linux-gnu.tar.gz" &
+        wget -qO "$TEMP_DIR/N_m3u8DL_RE.tar.gz" "https://github.com/nilaoda/N_m3u8DL-RE/releases/download/v0.3.0-beta/N_m3u8DL-RE_v0.3.0-beta_linux-x64_20241203.tar.gz" &
+    else
+        wget -qO "$BIN_DIR/xnox" "https://github.com/userdocs/qbittorrent-nox-static/releases/latest/download/aarch64-qbittorrent-nox" &
+        wget -qO "$TEMP_DIR/ffmpeg.tar.xz" "https://github.com/5hojib/FFmpeg-Builds/releases/latest/download/ffmpeg-n7.1-latest-linuxarm64-gpl-7.1.tar.xz" &
+        wget -qO "$TEMP_DIR/uv.tar.gz" "https://github.com/astral-sh/uv/releases/latest/download/uv-aarch64-unknown-linux-gnu.tar.gz" &
+        wget -qO "$TEMP_DIR/N_m3u8DL_RE.tar.gz" "https://github.com/nilaoda/N_m3u8DL-RE/releases/download/v0.3.0-beta/N_m3u8DL-RE_v0.3.0-beta_linux-arm64_20241203.tar.gz" &
+    fi
+    wget -qO "$JDOWNLOADER_HOME/JDownloader.jar" http://installer.jdownloader.org/JDownloader.jar &
+    
+    wait
+}
+
+install_packages() {
+    apt-get update
+    apt-get upgrade -y
+
+    # Base packages for all architectures
+    local base_packages=(
+        python3.13
+        python3.13-dev
+        python3.13-venv
+        libpython3.13
+        libpython3.13-dev
+        python3-pip
+        sabnzbdplus
+        aria2
+        sox
+        libsox-fmt-all
+        curl
+        zstd
+        xz-utils
+        git
+        libmagic-dev
+        p7zip-full
+        p7zip-rar
+        tzdata
+        wget
+        openjdk-21-jre
+        openjdk-21-jre-headless
+        mediainfo
+        cpulimit
+    )
+
+    # MEGA SDK build dependencies (for both x86_64 and aarch64)
+    local mega_build_packages=(
+        apt-utils
+        curl
+        zstd
+        git
+        libmagic-dev
+        locales
+        wget
+        autoconf
+        automake
+        build-essential
+        cmake
+        g++
+        gcc
+        gettext
+        gpg-agent
+        intltool
+        libtool
+        make
+        pkg-config
+        yasm
+        unzip
+        zip
+        libcurl4-openssl-dev
+        libssl-dev
+        libssh-dev
+        libcrypto++-dev
+        libc-ares-dev
+        libsqlite3-dev
+        libsodium-dev
+        libfreeimage-dev
+        swig
+        libboost-all-dev
+        libpthread-stubs0-dev
+        zlib1g-dev
+    )
+
+    # MEGA SDK runtime dependencies
+    local mega_runtime_packages=(
+        libcares2
+        libcurl4
+        libuv1
+        libcrypto++8
+        libsodium23
+        libsqlite3-0
+        libssl3
+        libfreeimage3
+        zlib1g
+    )
+
+    # Detect architecture
+    local arch=$(uname -m)
+    local packages_to_install=("${base_packages[@]}")
+
+    # Install MEGA SDK dependencies for both architectures
+    echo "🏗️  Installing packages for $arch architecture (including MEGA SDK dependencies)"
+    packages_to_install+=("${mega_build_packages[@]}")
+    packages_to_install+=("${mega_runtime_packages[@]}")
+
+    apt-get install -y --no-install-recommends "${packages_to_install[@]}"
+
+    ln -sf /usr/bin/python3.13 /usr/bin/python3
+    ln -sf /usr/bin/python3.13 /usr/bin/python
+}
+
+build_mp4box() {
+    echo "🔧 Building MP4Box..."
+    git clone https://github.com/gpac/gpac.git "$TEMP_DIR/gpac"
+    cd "$TEMP_DIR/gpac"
+    ./configure
+    make -j$(nproc)
+    mv bin/gcc/MP4Box /usr/bin/
+    chmod +x /usr/bin/MP4Box
+}
+
+build_mp4decrypt() {
+    echo "🔧 Building mp4decrypt..."
+    git clone https://github.com/axiomatic-systems/Bento4.git "$TEMP_DIR/Bento4"
+    cd "$TEMP_DIR/Bento4"
+    mkdir cmakebuild && cd cmakebuild
+    cmake -DCMAKE_BUILD_TYPE=Release ..
+    make AP4_BUILD_CONFIG=Release -j$(nproc)
+    mv mp4decrypt /usr/bin/
+    chmod +x /usr/bin/mp4decrypt
+}
+
+build_mega_sdk() {
+    echo "🔧 Building MEGA SDK v4.8.0..."
+    
+    uv pip install --system -U setuptools --break-system-packages
+    
+    git clone https://github.com/meganz/sdk.git --depth=1 -b v4.8.0 /home/sdk
+    cd /home/sdk
+    rm -rf .git
+    autoreconf -fiv && ./autogen.sh
+    ./configure --disable-silent-rules --enable-python --with-sodium --disable-examples
+    make -j$(nproc --all)
+
+    cd bindings/python/
+    python3.13 setup.py bdist_wheel
+    uv pip install --system --break-system-packages --no-cache-dir dist/*.whl
+
+    # Configure library paths for MEGA SDK
+    echo "🔧 Configuring MEGA SDK library paths..."
+
+    # Find where MEGA SDK was installed
+    MEGA_INSTALL_PATH=$(python3.13 -c "
+import sys
+from pathlib import Path
+for path in sys.path:
+    mega_path = Path(path) / 'mega'
+    if mega_path.exists():
+        print(path)
+        break
+" 2>/dev/null || echo "/usr/local/lib/python3.13/dist-packages")
+
+    echo "📁 MEGA SDK installed in: $MEGA_INSTALL_PATH"
+
+    # Create library configuration for MEGA SDK
+    echo "$MEGA_INSTALL_PATH/mega" > /etc/ld.so.conf.d/megasdk.conf
+    ldconfig
+
+    # Set library path for MEGA SDK shared libraries
+    export LD_LIBRARY_PATH="$MEGA_INSTALL_PATH/mega:/usr/local/lib:${LD_LIBRARY_PATH:-}"
+
+    # Change to a different directory to avoid importing from source
+    cd /tmp
+
+    # Verify MEGA SDK installation
+    echo "🔍 Verifying MEGA SDK installation..."
+    LD_LIBRARY_PATH="$MEGA_INSTALL_PATH/mega:/usr/local/lib:${LD_LIBRARY_PATH:-}" python3.13 -c "
+import mega
+api = mega.MegaApi('test')
+version = api.getVersion()
+print('✅ MEGA SDK v4.8.0 imported successfully')
+print(f'📋 API version: {version}')
+" || {
+    echo "❌ MEGA SDK installation verification failed"
+    exit 1
+}
+
+    # Create permanent library path configuration
+    echo "🔧 Creating permanent library path configuration..."
+    echo "export LD_LIBRARY_PATH=\"$MEGA_INSTALL_PATH/mega:/usr/local/lib:\${LD_LIBRARY_PATH:-}\"" >> /etc/environment
+
+    # Clean up source directory after successful verification
+    rm -rf /home/sdk
+    echo "✅ MEGA SDK v4.8.0 installed and verified successfully"
+}
+
+# Process and move files
+process_files() {
+    chmod 700 "$BIN_DIR/xnox"
+    
+    # Extract FFmpeg
+    tar -xf "$TEMP_DIR/ffmpeg.tar.xz" -C "$TEMP_DIR"
+    local ffmpeg_dir=$(find "$TEMP_DIR" -type d -name "ffmpeg-n7.1-latest-linux*" | head -n 1)
+    mv "$ffmpeg_dir/bin/ffmpeg" /usr/bin/xtra
+    mv "$ffmpeg_dir/bin/ffprobe" /usr/bin/ffprobe
+    mv "$ffmpeg_dir/bin/ffplay" /usr/bin/ffplay
+    chmod +x /usr/bin/xtra /usr/bin/ffprobe /usr/bin/ffplay
+    
+    # Extract UV
+    tar -xzf "$TEMP_DIR/uv.tar.gz" -C "$TEMP_DIR"
+    mv $(find "$TEMP_DIR" -type f -name "uv" | head -n 1) /usr/bin/uv
+    chmod +x /usr/bin/uv
+
+    # Extract N_m3u8DL_RE
+    tar -xzf "$TEMP_DIR/N_m3u8DL_RE.tar.gz" -C "$TEMP_DIR"
+    mv $(find "$TEMP_DIR" -type f -name "N_m3u8DL-RE" | head -n 1) /usr/bin/N_m3u8DL-RE
+    chmod +x /usr/bin/N_m3u8DL-RE
+    
+    # Install rclone
+    curl https://rclone.org/install.sh | bash
+
+    # Rename binaries
+    mv /usr/bin/rclone /usr/bin/xone
+    mv /usr/bin/aria2c /usr/bin/xria
+    mv /usr/bin/sabnzbdplus /usr/bin/xnzb
+    mv /usr/bin/N_m3u8DL-RE /usr/bin/xm3u8
+    mv /usr/bin/mp4decrypt /usr/bin/xmp4dec
+    mv /usr/bin/MP4Box /usr/bin/xmp4
+}
+
+cleanup() {
+    # Clean up MEGA SDK build dependencies
+    apt-get purge -y --auto-remove \
+        apt-utils zstd \
+        build-essential cmake pkg-config yasm gettext \
+        gpg-agent intltool libtool make \
+        libcurl4-openssl-dev libsodium-dev libssl-dev libfreeimage-dev \
+        swig libboost-all-dev libpthread-stubs0-dev autoconf automake \
+        wget perl xz-utils perl-modules-5.40
+
+    apt-get install -y --no-install-recommends \
+        git \
+        curl \
+        cpulimit
+
+    apt-get autoremove -y --purge
+    apt-get autoclean -y
+    apt-get clean -y
+
+    rm -rf \
+        /var/lib/apt/lists/* \
+        /tmp/* \
+        /var/tmp/* \
+        "$TEMP_DIR" \
+        Aeon \
+        Dockerfile \
+        ~/.cache
+
+    local arch=$(uname -m)
+    echo "✅ Cleanup completed - MEGA SDK v4.8.0 installed system-wide for $arch architecture"
+}
+
+main() {
+    install_packages
+    download_files
+    build_mp4box
+    build_mp4decrypt
+    process_files
+    build_mega_sdk
+    cleanup
+}
+
+main
