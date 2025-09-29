@@ -562,26 +562,6 @@ def add_handlers():
         # Add zotify handlers to command_filters
         command_filters.update(zotify_handlers)
 
-    # Add musicdl handlers if musicdl is enabled
-    if Config.MUSICDL_ENABLED:
-        from bot.modules.musicdl import musicleech_command, musicmirror_command
-
-        musicdl_handlers = {
-            "music_mirror": (
-                musicmirror_command,
-                BotCommands.MusicMirrorCommand,
-                CustomFilters.authorized,
-            ),
-            "music_leech": (
-                musicleech_command,
-                BotCommands.MusicLeechCommand,
-                CustomFilters.authorized,
-            ),
-        }
-
-        # Add musicdl handlers to command_filters
-        command_filters.update(musicdl_handlers)
-
     # Add MEGA search handler if MEGA search is enabled
     if Config.MEGA_ENABLED and Config.MEGA_SEARCH_ENABLED:
         from bot.modules.mega_search import mega_search_command
@@ -742,13 +722,6 @@ def add_handlers():
         from bot.modules.gallery_dl import gdl_callback
 
         public_regex_filters["^gdlq"] = gdl_callback
-
-    # Add MusicDL callback handlers if enabled
-    if Config.MUSICDL_ENABLED:
-        from bot.modules.musicdl import handle_musicdl_callback, musicdl_help_callback
-
-        public_regex_filters["^musicdl_"] = handle_musicdl_callback
-        public_regex_filters["^musicdl_help"] = musicdl_help_callback
 
     # Add handlers for callbacks that don't need authorization (accessible to all users)
     # These have higher priority (group=-1) to ensure they're processed first
