@@ -1,1 +1,0 @@
-# MEGA utilities package
