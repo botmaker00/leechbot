@@ -5,7 +5,6 @@ from time import time
 from httpx import AsyncClient
 from pyrogram.filters import regex, user
 from pyrogram.handlers import CallbackQueryHandler
-from yt_dlp import YoutubeDL
 
 from bot import DOWNLOAD_DIR, LOGGER, bot_loop, task_dict_lock
 from bot.core.config_manager import Config
@@ -655,6 +654,7 @@ class YtSelection:
 
 def extract_info(link, options):
     with YoutubeDL(options) as ydl:
+        from yt_dlp import YoutubeDL  # Lazy import
         result = ydl.extract_info(link, download=False)
         if result is None:
             raise ValueError("Info result is None")
