@@ -1,12 +1,17 @@
 import asyncio
 import math
 from collections.abc import AsyncGenerator
+import logging
+from typing import Dict, Tuple
 
 from pyrogram import Client, raw
 from pyrogram.errors import AuthBytesInvalid
 from pyrogram.file_id import FileId
 from pyrogram.session import Auth, Session
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class RawByteStreamer:
     """
@@ -19,7 +24,7 @@ class RawByteStreamer:
     - FastAPI compatible
     """
 
-    def __init__(self, clients: dict[int, Client], chat_id: int):
+    def __init__(self, clients: Dict[int, Client], chat_id: int):
         """
         Initialize with client pool and storage channel
 
@@ -29,9 +34,9 @@ class RawByteStreamer:
         """
         self.clients = clients
         self.chat_id = chat_id
-        self.cached_file_properties: dict[int, dict] = {}
-        self.cached_media_sessions: dict[tuple[int, int], Session] = {}  # (client_id, dc_id) -> Session
-        self.client_loads: dict[int, int] = dict.fromkeys(clients, 0)
+        self.cached_file_properties: Dict[int, dict] = {}
+        self.cached_media_sessions: Dict[Tuple[int, int], Session] = {}  # (client_id, dc_id) -> Session
+        self.client_loads: Dict[int, int] = dict.fromkeys(clients, 0)
 
         # Start cleanup task
         self._cleanup_task = asyncio.create_task(self._cleanup_cache())
@@ -47,10 +52,10 @@ class RawByteStreamer:
                     items = list(self.cached_file_properties.items())
                     self.cached_file_properties = dict(items[-50:])
 
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error(f"Cache cleanup failed: {e}")
 
-    def _get_optimal_client(self) -> tuple[Client, int]:
+    def _get_optimal_client(self) -> Tuple[Client, int]:
         """Get client with minimum load"""
         if not self.clients:
             raise RuntimeError("No clients available")
@@ -165,7 +170,8 @@ class RawByteStreamer:
 
             return file_info
 
-        except Exception:
+        except Exception as e:
+            logger.error(f"Failed to get file properties for message {message_id}: {e}")
             raise
 
     async def _get_media_session(self, client: Client, client_id: int, file_id: FileId) -> Session:
@@ -179,37 +185,53 @@ class RawByteStreamer:
             media_session = client.media_sessions.get(file_id.dc_id, None)
 
             if media_session is None:
+                test_mode = await client.storage.test_mode()
+                if test_mode is None:
+                    logger.warning("Test mode not set, defaulting to False")
+                    test_mode = False
+
                 if file_id.dc_id != await client.storage.dc_id():
                     # Different DC case
-                    auth_key = await Auth(client, file_id.dc_id, await client.storage.test_mode()).create()
+                    try:
+                        auth_key = await Auth(client, file_id.dc_id, test_mode).create()
+                    except Exception as e:
+                        logger.error(f"Failed to create auth key for DC {file_id.dc_id}: {e}")
+                        raise
 
                     media_session = Session(
-                        client,
-                        file_id.dc_id,
-                        auth_key,
-                        await client.storage.test_mode(),
+                        client=client,
+                        dc_id=file_id.dc_id,
+                        auth_key=auth_key,
+                        test_mode=test_mode,
                         is_media=True,
                     )
                     await media_session.start()
 
                     # Export & Import authorization
                     for _ in range(6):
-                        exported_auth = await client.invoke(raw.functions.auth.ExportAuthorization(dc_id=file_id.dc_id))
                         try:
+                            exported_auth = await client.invoke(raw.functions.auth.ExportAuthorization(dc_id=file_id.dc_id))
                             await media_session.send(raw.functions.auth.ImportAuthorization(id=exported_auth.id, bytes=exported_auth.bytes))
                             break
-                        except AuthBytesInvalid:
+                        except AuthBytesInvalid as e:
+                            logger.warning(f"AuthBytesInvalid, retrying: {e}")
                             continue
                     else:
                         await media_session.stop()
+                        logger.error("Failed to import authorization after retries")
                         raise AuthBytesInvalid
                 else:
-                    # Same DC case (FIXED: auth_key + test_mode added)
+                    # Same DC case
+                    auth_key = await client.storage.auth_key()
+                    if auth_key is None:
+                        logger.error("Auth key not found in client storage")
+                        raise ValueError("Auth key is required but not found in client storage")
+
                     media_session = Session(
-                        client,
-                        file_id.dc_id,
-                        await client.storage.auth_key(),
-                        await client.storage.test_mode(),
+                        client=client,
+                        dc_id=file_id.dc_id,
+                        auth_key=auth_key,
+                        test_mode=test_mode,
                         is_media=True,
                     )
                     await media_session.start()
@@ -221,12 +243,12 @@ class RawByteStreamer:
             self.cached_media_sessions[session_key] = media_session
             return media_session
 
-        except Exception:
+        except Exception as e:
+            logger.error(f"Failed to create media session for DC {file_id.dc_id}: {e}")
             raise
 
     async def _get_file_location(self, file_id: FileId):
         """Get file location for raw API"""
-        # For most media files, use InputDocumentFileLocation
         return raw.types.InputDocumentFileLocation(
             id=file_id.media_id,
             access_hash=file_id.access_hash,
@@ -311,10 +333,12 @@ class RawByteStreamer:
                     current_part += 1
                     current_offset += chunk_size
 
-                except Exception:
+                except Exception as e:
+                    logger.error(f"Error streaming chunk {current_part} for message {message_id}: {e}")
                     break
 
-        except Exception:
+        except Exception as e:
+            logger.error(f"Error streaming file for message {message_id}: {e}")
             raise
         finally:
             self._decrement_load(client_id)
@@ -331,7 +355,8 @@ class RawByteStreamer:
 
             return message
 
-        except Exception:
+        except Exception as e:
+            logger.error(f"Failed to get message {message_id}: {e}")
             raise
 
     def get_file_info(self, message_id: int) -> dict:
@@ -375,9 +400,11 @@ def create_raw_streamer(chat_id: int) -> RawByteStreamer | None:
                     clients[client_id] = client
 
         if not clients:
+            logger.error("No clients available for RawByteStreamer")
             return None
 
         return RawByteStreamer(clients, chat_id)
 
-    except Exception:
+    except Exception as e:
+        logger.error(f"Failed to create RawByteStreamer: {e}")
         return None
