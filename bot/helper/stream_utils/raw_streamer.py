@@ -174,92 +174,91 @@ class RawByteStreamer:
             logger.error(f"Failed to get file properties for message {message_id}: {e}")
             raise
 
-
     async def _get_media_session(self, client: Client, client_id: int, file_id: FileId) -> Session:
-    """Get or create media session for specific DC"""
-    session_key = (client_id, file_id.dc_id)
+        """Get or create media session for specific DC"""
+        session_key = (client_id, file_id.dc_id)
 
-    if session_key in self.cached_media_sessions:
-        return self.cached_media_sessions[session_key]
+        if session_key in self.cached_media_sessions:
+            return self.cached_media_sessions[session_key]
 
-    try:
-        media_session = client.media_sessions.get(file_id.dc_id, None)
+        try:
+            media_session = client.media_sessions.get(file_id.dc_id, None)
 
-        if media_session is None:
-            test_mode = await client.storage.test_mode()
-            if test_mode is None:
-                logger.warning("Test mode not set, defaulting to False")
-                test_mode = False
+            if media_session is None:
+                test_mode = await client.storage.test_mode()
+                if test_mode is None:
+                    logger.warning("Test mode not set, defaulting to False")
+                    test_mode = False
 
-            # Get server address based on dc_id and test_mode
-            dc_list = client.DC_LIST if not test_mode else client.TEST_DC_LIST
-            dc_config = dc_list.get(file_id.dc_id)
-            if not dc_config:
-                logger.error(f"No server address found for DC {file_id.dc_id}")
-                raise ValueError(f"No server address found for DC {file_id.dc_id}")
-            server_address, port = dc_config
+                # Get server address and port based on dc_id and test_mode
+                dc_list = getattr(client, 'DC_LIST', DC_LIST) if not test_mode else getattr(client, 'TEST_DC_LIST', TEST_DC_LIST)
+                dc_config = dc_list.get(file_id.dc_id)
+                if not dc_config:
+                    logger.error(f"No server address found for DC {file_id.dc_id}")
+                    raise ValueError(f"No server address found for DC {file_id.dc_id}")
+                server_address, port = dc_config
 
-            if file_id.dc_id != await client.storage.dc_id():
-                # Different DC case
-                try:
-                    auth_key = await Auth(client, file_id.dc_id, test_mode).create()
-                except Exception as e:
-                    logger.error(f"Failed to create auth key for DC {file_id.dc_id}: {e}")
-                    raise
-
-                media_session = Session(
-                    client=client,
-                    dc_id=file_id.dc_id,
-                    auth_key=auth_key,
-                    test_mode=test_mode,
-                    server_address=server_address,
-                    port=port,
-                    is_media=True,
-                )
-                await media_session.start()
-
-                # Export & Import authorization
-                for _ in range(6):
+                if file_id.dc_id != await client.storage.dc_id():
+                    # Different DC case
                     try:
-                        exported_auth = await client.invoke(raw.functions.auth.ExportAuthorization(dc_id=file_id.dc_id))
-                        await media_session.send(raw.functions.auth.ImportAuthorization(id=exported_auth.id, bytes=exported_auth.bytes))
-                        break
-                    except AuthBytesInvalid as e:
-                        logger.warning(f"AuthBytesInvalid, retrying: {e}")
-                        continue
+                        auth_key = await Auth(client, file_id.dc_id, test_mode).create()
+                    except Exception as e:
+                        logger.error(f"Failed to create auth key for DC {file_id.dc_id}: {e}")
+                        raise
+
+                    media_session = Session(
+                        client=client,
+                        dc_id=file_id.dc_id,
+                        auth_key=auth_key,
+                        test_mode=test_mode,
+                        server_address=server_address,
+                        port=port,
+                        is_media=True,
+                    )
+                    await media_session.start()
+
+                    # Export & Import authorization
+                    for _ in range(6):
+                        try:
+                            exported_auth = await client.invoke(raw.functions.auth.ExportAuthorization(dc_id=file_id.dc_id))
+                            await media_session.send(raw.functions.auth.ImportAuthorization(id=exported_auth.id, bytes=exported_auth.bytes))
+                            break
+                        except AuthBytesInvalid as e:
+                            logger.warning(f"AuthBytesInvalid, retrying: {e}")
+                            continue
+                    else:
+                        await media_session.stop()
+                        logger.error("Failed to import authorization after retries")
+                        raise AuthBytesInvalid
                 else:
-                    await media_session.stop()
-                    logger.error("Failed to import authorization after retries")
-                    raise AuthBytesInvalid
-            else:
-                # Same DC case
-                auth_key = await client.storage.auth_key()
-                if auth_key is None:
-                    logger.error("Auth key not found in client storage")
-                    raise ValueError("Auth key is required but not found in client storage")
+                    # Same DC case
+                    auth_key = await client.storage.auth_key()
+                    if auth_key is None:
+                        logger.error("Auth key not found in client storage")
+                        raise ValueError("Auth key is required but not found in client storage")
 
-                media_session = Session(
-                    client=client,
-                    dc_id=file_id.dc_id,
-                    auth_key=auth_key,
-                    test_mode=test_mode,
-                    server_address=server_address,
-                    port=port,
-                    is_media=True,
-                )
-                await media_session.start()
+                    media_session = Session(
+                        client=client,
+                        dc_id=file_id.dc_id,
+                        auth_key=auth_key,
+                        test_mode=test_mode,
+                        server_address=server_address,
+                        port=port,
+                        is_media=True,
+                    )
+                    await media_session.start()
 
-            # Cache the session
-            client.media_sessions[file_id.dc_id] = media_session
+                # Cache the session
+                client.media_sessions[file_id.dc_id] = media_session
 
-        # Cache our reference
-        self.cached_media_sessions[session_key] = media_session
-        return media_session
+            # Cache our reference
+            self.cached_media_sessions[session_key] = media_session
+            return media_session
 
-    except Exception as e:
-        logger.error(f"Failed to create media session for DC {file_id.dc_id}: {e}")
-        raise
-        
+        except Exception as e:
+            logger.error(f"Failed to create media session for DC {file_id.dc_id}: {e}")
+            raise
+
     async def _get_file_location(self, file_id: FileId):
         """Get file location for raw API"""
         return raw.types.InputDocumentFileLocation(
