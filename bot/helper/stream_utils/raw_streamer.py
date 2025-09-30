@@ -190,13 +190,18 @@ class RawByteStreamer:
                     logger.warning("Test mode not set, defaulting to False")
                     test_mode = False
 
-                # Get server address and port based on dc_id and test_mode
-                dc_list = getattr(client, 'DC_LIST', DC_LIST) if not test_mode else getattr(client, 'TEST_DC_LIST', TEST_DC_LIST)
-                dc_config = dc_list.get(file_id.dc_id)
-                if not dc_config:
-                    logger.error(f"No server address found for DC {file_id.dc_id}")
-                    raise ValueError(f"No server address found for DC {file_id.dc_id}")
-                server_address, port = dc_config
+                # Get server address and port
+                try:
+                    # Try to use client.get_dc() if available
+                    dc_config = await client.get_dc(file_id.dc_id) if hasattr(client, 'get_dc') else None
+                    if dc_config:
+                        server_address, port = dc_config.ip_address, dc_config.port
+                    else:
+                        # Fallback to a default Telegram DC
+                        server_address, port = "149.154.167.51", 443
+                except Exception as e:
+                    logger.warning(f"Failed to get DC config for DC {file_id.dc_id}: {e}, using fallback")
+                    server_address, port = "149.154.167.51", 443
 
                 if file_id.dc_id != await client.storage.dc_id():
                     # Different DC case
