@@ -1,8 +1,3 @@
-"""
-Raw API Streaming Implementation
-Based on File-To-Link's efficient approach but adapted for FastAPI
-"""
-
 import asyncio
 import math
 from collections.abc import AsyncGenerator
@@ -35,9 +30,7 @@ class RawByteStreamer:
         self.clients = clients
         self.chat_id = chat_id
         self.cached_file_properties: dict[int, dict] = {}
-        self.cached_media_sessions: dict[
-            tuple[int, int], Session
-        ] = {}  # (client_id, dc_id) -> Session
+        self.cached_media_sessions: dict[tuple[int, int], Session] = {}  # (client_id, dc_id) -> Session
         self.client_loads: dict[int, int] = dict.fromkeys(clients, 0)
 
         # Start cleanup task
@@ -88,9 +81,7 @@ class RawByteStreamer:
             # Get message from storage channel
             message = await client.get_messages(self.chat_id, message_id)
             if not message or not message.media:
-                raise FileNotFoundError(
-                    f"Message {message_id} not found or has no media"
-                )
+                raise FileNotFoundError(f"Message {message_id} not found or has no media")
 
             # Extract file properties from message
             file_info = {}
@@ -100,16 +91,14 @@ class RawByteStreamer:
                 file_info = {
                     "file_size": message.document.file_size,
                     "file_name": message.document.file_name or "document",
-                    "mime_type": message.document.mime_type
-                    or "application/octet-stream",
+                    "mime_type": message.document.mime_type or "application/octet-stream",
                     "media_type": "document",
                 }
                 file_id = FileId.decode(message.document.file_id)
             elif message.video:
                 file_info = {
                     "file_size": message.video.file_size,
-                    "file_name": message.video.file_name
-                    or f"video.{message.video.mime_type.split('/')[-1] if message.video.mime_type else 'mp4'}",
+                    "file_name": message.video.file_name or f"video.{message.video.mime_type.split('/')[-1] if message.video.mime_type else 'mp4'}",
                     "mime_type": message.video.mime_type or "video/mp4",
                     "media_type": "video",
                 }
@@ -117,8 +106,7 @@ class RawByteStreamer:
             elif message.audio:
                 file_info = {
                     "file_size": message.audio.file_size,
-                    "file_name": message.audio.file_name
-                    or f"audio.{message.audio.mime_type.split('/')[-1] if message.audio.mime_type else 'mp3'}",
+                    "file_name": message.audio.file_name or f"audio.{message.audio.mime_type.split('/')[-1] if message.audio.mime_type else 'mp3'}",
                     "mime_type": message.audio.mime_type or "audio/mpeg",
                     "media_type": "audio",
                 }
@@ -136,8 +124,7 @@ class RawByteStreamer:
             elif message.animation:
                 file_info = {
                     "file_size": message.animation.file_size,
-                    "file_name": message.animation.file_name
-                    or f"animation.{message.animation.mime_type.split('/')[-1] if message.animation.mime_type else 'gif'}",
+                    "file_name": message.animation.file_name or f"animation.{message.animation.mime_type.split('/')[-1] if message.animation.mime_type else 'gif'}",
                     "mime_type": message.animation.mime_type or "image/gif",
                     "media_type": "animation",
                 }
@@ -181,72 +168,61 @@ class RawByteStreamer:
         except Exception:
             raise
 
-async def _get_media_session(
-    self, client: Client, client_id: int, file_id: FileId
-) -> Session:
-    """Get or create media session for specific DC"""
-    session_key = (client_id, file_id.dc_id)
+    async def _get_media_session(self, client: Client, client_id: int, file_id: FileId) -> Session:
+        """Get or create media session for specific DC"""
+        session_key = (client_id, file_id.dc_id)
 
-    if session_key in self.cached_media_sessions:
-        return self.cached_media_sessions[session_key]
+        if session_key in self.cached_media_sessions:
+            return self.cached_media_sessions[session_key]
 
-    try:
-        media_session = client.media_sessions.get(file_id.dc_id, None)
+        try:
+            media_session = client.media_sessions.get(file_id.dc_id, None)
 
-        if media_session is None:
-            if file_id.dc_id != await client.storage.dc_id():
-                # ✅ Different DC case
-                auth_key = await Auth(
-                    client, file_id.dc_id, await client.storage.test_mode()
-                ).create()
+            if media_session is None:
+                if file_id.dc_id != await client.storage.dc_id():
+                    # Different DC case
+                    auth_key = await Auth(client, file_id.dc_id, await client.storage.test_mode()).create()
 
-                media_session = Session(
-                    client,
-                    file_id.dc_id,
-                    auth_key,
-                    await client.storage.test_mode(),
-                    is_media=True,
-                )
-                await media_session.start()
-
-                # Export & Import authorization
-                for _ in range(6):
-                    exported_auth = await client.invoke(
-                        raw.functions.auth.ExportAuthorization(dc_id=file_id.dc_id)
+                    media_session = Session(
+                        client,
+                        file_id.dc_id,
+                        auth_key,
+                        await client.storage.test_mode(),
+                        is_media=True,
                     )
-                    try:
-                        await media_session.send(
-                            raw.functions.auth.ImportAuthorization(
-                                id=exported_auth.id,
-                                bytes=exported_auth.bytes,
-                            )
-                        )
-                        break
-                    except AuthBytesInvalid:
-                        continue
+                    await media_session.start()
+
+                    # Export & Import authorization
+                    for _ in range(6):
+                        exported_auth = await client.invoke(raw.functions.auth.ExportAuthorization(dc_id=file_id.dc_id))
+                        try:
+                            await media_session.send(raw.functions.auth.ImportAuthorization(id=exported_auth.id, bytes=exported_auth.bytes))
+                            break
+                        except AuthBytesInvalid:
+                            continue
+                    else:
+                        await media_session.stop()
+                        raise AuthBytesInvalid
                 else:
-                    await media_session.stop()
-                    raise AuthBytesInvalid
-            else:
-                # ✅ Same DC case (FIXED: auth_key + test_mode added)
-                media_session = Session(
-                    client,
-                    file_id.dc_id,
-                    await client.storage.auth_key(),
-                    await client.storage.test_mode(),
-                    is_media=True,
-                )
-                await media_session.start()
+                    # Same DC case (FIXED: auth_key + test_mode added)
+                    media_session = Session(
+                        client,
+                        file_id.dc_id,
+                        await client.storage.auth_key(),
+                        await client.storage.test_mode(),
+                        is_media=True,
+                    )
+                    await media_session.start()
 
-            # Cache the session
-            client.media_sessions[file_id.dc_id] = media_session
+                # Cache the session
+                client.media_sessions[file_id.dc_id] = media_session
 
-        # Cache our reference
-        self.cached_media_sessions[session_key] = media_session
-        return media_session
+            # Cache our reference
+            self.cached_media_sessions[session_key] = media_session
+            return media_session
 
-    except Exception:
-        raise
+        except Exception:
+            raise
 
     async def _get_file_location(self, file_id: FileId):
         """Get file location for raw API"""
@@ -258,9 +234,7 @@ async def _get_media_session(
             thumb_size="",  # Empty string for full file
         )
 
-    async def stream_file(
-        self, message_id: int, offset: int = 0, limit: int = 0
-    ) -> AsyncGenerator[bytes]:
+    async def stream_file(self, message_id: int, offset: int = 0, limit: int = 0) -> AsyncGenerator[bytes]:
         """
         Stream file using raw API (like File-To-Link)
 
@@ -293,9 +267,7 @@ async def _get_media_session(
             last_part_cut = (end_byte % chunk_size) + 1
 
             # Calculate part count
-            part_count = math.ceil((end_byte + 1) / chunk_size) - math.floor(
-                aligned_offset / chunk_size
-            )
+            part_count = math.ceil((end_byte + 1) / chunk_size) - math.floor(aligned_offset / chunk_size)
 
             # Get media session and location
             media_session = await self._get_media_session(client, client_id, file_id)
@@ -309,13 +281,7 @@ async def _get_media_session(
             while current_part <= part_count:
                 try:
                     # Get chunk from Telegram
-                    r = await media_session.send(
-                        raw.functions.upload.GetFile(
-                            location=location,
-                            offset=current_offset,
-                            limit=chunk_size,
-                        )
-                    )
+                    r = await media_session.send(raw.functions.upload.GetFile(location=location, offset=current_offset, limit=chunk_size))
 
                     if isinstance(r, raw.types.upload.File):
                         chunk = r.bytes
@@ -361,9 +327,7 @@ async def _get_media_session(
             message = await client.get_messages(self.chat_id, message_id)
 
             if not message or not message.media:
-                raise FileNotFoundError(
-                    f"Message {message_id} not found or has no media"
-                )
+                raise FileNotFoundError(f"Message {message_id} not found or has no media")
 
             return message
 
