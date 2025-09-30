@@ -24,7 +24,7 @@ REDEPLOY_INTERVAL_DAYS = 7  # Auto redeploy interval in days (1, 3, 7, 14, or 30
 
 # Update
 UPSTREAM_REPO = "https://github.com/botmaker00/leechbot"  # Repository URL for updates
-UPSTREAM_BRANCH = "extended"  # Branch to use for updates
+UPSTREAM_BRANCH = "main"  # Branch to use for updates
 
 # Branding Settings
 CREDIT = "Powered by @Animeworld_zone"  # Credit text shown in status messages and RSS feeds (default: "Powered by @aimmirror")
