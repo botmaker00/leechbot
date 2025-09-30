@@ -10,7 +10,7 @@ from pyrogram.file_id import FileId
 from pyrogram.session import Auth, Session
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)  # Set to DEBUG for detailed logs
 logger = logging.getLogger(__name__)
 
 class RawByteStreamer:
@@ -48,9 +48,11 @@ class RawByteStreamer:
                 await asyncio.sleep(30 * 60)  # 30 minutes
                 # Clear file properties cache
                 if len(self.cached_file_properties) > 100:
-                    # Keep only recent 50 entries
                     items = list(self.cached_file_properties.items())
                     self.cached_file_properties = dict(items[-50:])
+                # Clear media sessions cache
+                if len(self.cached_media_sessions) > 100:
+                    self.cached_media_sessions = dict(list(self.cached_media_sessions.items())[-50:])
 
             except Exception as e:
                 logger.error(f"Cache cleanup failed: {e}")
@@ -60,7 +62,6 @@ class RawByteStreamer:
         if not self.clients:
             raise RuntimeError("No clients available")
 
-        # Find client with minimum load
         min_client_id = min(self.client_loads, key=self.client_loads.get)
         return self.clients[min_client_id], min_client_id
 
@@ -79,16 +80,13 @@ class RawByteStreamer:
         if message_id in self.cached_file_properties:
             return self.cached_file_properties[message_id]
 
-        # Get optimal client for file property retrieval
         client, client_id = self._get_optimal_client()
 
         try:
-            # Get message from storage channel
             message = await client.get_messages(self.chat_id, message_id)
             if not message or not message.media:
                 raise FileNotFoundError(f"Message {message_id} not found or has no media")
 
-            # Extract file properties from message
             file_info = {}
             file_id = None
 
@@ -117,8 +115,7 @@ class RawByteStreamer:
                 }
                 file_id = FileId.decode(message.audio.file_id)
             elif message.photo:
-                # For photos, we need to get the largest size
-                photo_size = message.photo.sizes[-1]  # Get largest size
+                photo_size = message.photo.sizes[-1]
                 file_info = {
                     "file_size": photo_size.file_size,
                     "file_name": f"photo_{message_id}.jpg",
@@ -162,12 +159,8 @@ class RawByteStreamer:
             if not file_id or not file_info:
                 raise ValueError(f"Unsupported media type in message {message_id}")
 
-            # Add FileId to the info for internal use
             file_info["_file_id"] = file_id
-
-            # Cache the result
             self.cached_file_properties[message_id] = file_info
-
             return file_info
 
         except Exception as e:
@@ -190,21 +183,29 @@ class RawByteStreamer:
                     logger.warning("Test mode not set, defaulting to False")
                     test_mode = False
 
-                # Get server address and port
+                # Try to resolve DC dynamically
                 try:
-                    # Try to use client.get_dc() if available
-                    dc_config = await client.get_dc(file_id.dc_id) if hasattr(client, 'get_dc') else None
-                    if dc_config:
+                    if hasattr(client, 'get_dc'):
+                        dc_config = await client.get_dc(file_id.dc_id)
                         server_address, port = dc_config.ip_address, dc_config.port
                     else:
-                        # Fallback to a default Telegram DC
-                        server_address, port = "149.154.167.51", 443
+                        # Fallback to known Telegram DCs
+                        dc_list = {
+                            1: ("149.154.175.50", 443),
+                            2: ("149.154.167.51", 443),
+                            3: ("149.154.175.100", 443),
+                            4: ("149.154.167.91", 443),
+                            5: ("91.108.56.130", 443),
+                        }
+                        dc_config = dc_list.get(file_id.dc_id, ("149.154.175.50", 443))
+                        server_address, port = dc_config
                 except Exception as e:
                     logger.warning(f"Failed to get DC config for DC {file_id.dc_id}: {e}, using fallback")
-                    server_address, port = "149.154.167.51", 443
+                    server_address, port = "149.154.175.50", 443
+
+                logger.debug(f"Creating session for DC {file_id.dc_id} with server {server_address}:{port}")
 
                 if file_id.dc_id != await client.storage.dc_id():
-                    # Different DC case
                     try:
                         auth_key = await Auth(client, file_id.dc_id, test_mode).create()
                     except Exception as e:
@@ -222,7 +223,6 @@ class RawByteStreamer:
                     )
                     await media_session.start()
 
-                    # Export & Import authorization
                     for _ in range(6):
                         try:
                             exported_auth = await client.invoke(raw.functions.auth.ExportAuthorization(dc_id=file_id.dc_id))
@@ -236,7 +236,6 @@ class RawByteStreamer:
                         logger.error("Failed to import authorization after retries")
                         raise AuthBytesInvalid
                 else:
-                    # Same DC case
                     auth_key = await client.storage.auth_key()
                     if auth_key is None:
                         logger.error("Auth key not found in client storage")
@@ -253,10 +252,8 @@ class RawByteStreamer:
                     )
                     await media_session.start()
 
-                # Cache the session
                 client.media_sessions[file_id.dc_id] = media_session
 
-            # Cache our reference
             self.cached_media_sessions[session_key] = media_session
             return media_session
 
@@ -270,7 +267,7 @@ class RawByteStreamer:
             id=file_id.media_id,
             access_hash=file_id.access_hash,
             file_reference=file_id.file_reference,
-            thumb_size="",  # Empty string for full file
+            thumb_size="",
         )
 
     async def stream_file(self, message_id: int, offset: int = 0, limit: int = 0) -> AsyncGenerator[bytes]:
@@ -286,73 +283,72 @@ class RawByteStreamer:
         self._increment_load(client_id)
 
         try:
-            # Get file properties
             file_info = await self.get_file_properties(message_id)
             file_id = file_info["_file_id"]
             file_size = file_info["file_size"]
 
-            # Calculate streaming parameters (like File-To-Link)
             chunk_size = 1024 * 1024  # 1MB chunks
-
-            # Determine end byte
             if limit > 0:
                 end_byte = min(offset + limit - 1, file_size - 1)
             else:
                 end_byte = file_size - 1
 
-            # Align offset to chunk boundary
             aligned_offset = offset - (offset % chunk_size)
             first_part_cut = offset - aligned_offset
             last_part_cut = (end_byte % chunk_size) + 1
-
-            # Calculate part count
             part_count = math.ceil((end_byte + 1) / chunk_size) - math.floor(aligned_offset / chunk_size)
 
-            # Get media session and location
             media_session = await self._get_media_session(client, client_id, file_id)
             location = await self._get_file_location(file_id)
 
-            # Stream chunks using raw API
             current_part = 1
             current_offset = aligned_offset
             bytes_streamed = 0
 
             while current_part <= part_count:
-                try:
-                    # Get chunk from Telegram
-                    r = await media_session.send(raw.functions.upload.GetFile(location=location, offset=current_offset, limit=chunk_size))
+                for attempt in range(5):  # Increased retries to 5
+                    try:
+                        async with asyncio.timeout(30):  # Increased to 30 seconds
+                            r = await media_session.send(raw.functions.upload.GetFile(location=location, offset=current_offset, limit=chunk_size))
 
-                    if isinstance(r, raw.types.upload.File):
-                        chunk = r.bytes
-                        if not chunk:
+                            if isinstance(r, raw.types.upload.File):
+                                chunk = r.bytes
+                                if not chunk:
+                                    logger.warning(f"Empty chunk received for message {message_id}, part {current_part}")
+                                    break
+
+                                if part_count == 1:
+                                    chunk = chunk[first_part_cut:last_part_cut]
+                                elif current_part == 1:
+                                    chunk = chunk[first_part_cut:]
+                                elif current_part == part_count:
+                                    chunk = chunk[:last_part_cut]
+
+                                if chunk:
+                                    yield chunk
+                                    bytes_streamed += len(chunk)
+
+                                    if limit > 0 and bytes_streamed >= limit:
+                                        return
+
+                            current_part += 1
+                            current_offset += chunk_size
                             break
 
-                        # Apply cuts for range requests (like File-To-Link)
-                        if part_count == 1:
-                            # Single part - cut both ends
-                            chunk = chunk[first_part_cut:last_part_cut]
-                        elif current_part == 1:
-                            # First part - cut beginning
-                            chunk = chunk[first_part_cut:]
-                        elif current_part == part_count:
-                            # Last part - cut end
-                            chunk = chunk[:last_part_cut]
-                        # Middle parts - no cutting needed
-
-                        if chunk:
-                            yield chunk
-                            bytes_streamed += len(chunk)
-
-                            # Check if we've streamed enough
-                            if limit > 0 and bytes_streamed >= limit:
-                                break
-
-                    current_part += 1
-                    current_offset += chunk_size
-
-                except Exception as e:
-                    logger.error(f"Error streaming chunk {current_part} for message {message_id}: {e}")
-                    break
+                    except asyncio.TimeoutError:
+                        logger.warning(f"Timeout on chunk {current_part} for message {message_id}, attempt {attempt + 1}")
+                        if attempt == 4:
+                            logger.error(f"Failed to stream chunk {current_part} for message {message_id} after retries")
+                            raise
+                        try:
+                            await media_session.stop()
+                            media_session = await self._get_media_session(client, client_id, file_id)
+                        except Exception as e:
+                            logger.error(f"Failed to reinitialize session for DC {file_id.dc_id}: {e}")
+                            raise
+                    except Exception as e:
+                        logger.error(f"Error streaming chunk {current_part} for message {message_id}: {e}")
+                        break
 
         except Exception as e:
             logger.error(f"Error streaming file for message {message_id}: {e}")
@@ -363,7 +359,6 @@ class RawByteStreamer:
     async def get_message(self, message_id: int):
         """Get message from storage channel (for web server compatibility)"""
         try:
-            # Get optimal client for message retrieval
             client, client_id = self._get_optimal_client()
             message = await client.get_messages(self.chat_id, message_id)
 
@@ -379,8 +374,6 @@ class RawByteStreamer:
     def get_file_info(self, message_id: int) -> dict:
         """Get file info for web server (sync wrapper)"""
         try:
-            # This is a sync method for compatibility, but we need async
-            # The web server should call get_file_properties directly
             return {"error": "Use get_file_properties async method instead"}
         except Exception as e:
             return {"error": str(e)}
@@ -403,14 +396,10 @@ def create_raw_streamer(chat_id: int) -> RawByteStreamer | None:
     try:
         from bot.core.aeon_client import TgClient
 
-        # Build client pool
         clients = {}
-
-        # Add main bot
         if hasattr(TgClient, "bot") and TgClient.bot is not None:
             clients[0] = TgClient.bot
 
-        # Add helper bots
         if hasattr(TgClient, "helper_bots") and TgClient.helper_bots:
             for client_id, client in TgClient.helper_bots.items():
                 if client is not None:
