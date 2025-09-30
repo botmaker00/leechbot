@@ -270,7 +270,7 @@ WEB_PINCODE = False  # Enable pincode protection for web server
 # File2Link Settings
 FILE2LINK_ENABLED = True  # Enable File2Link functionality
 FILE2LINK_BASE_URL = "http://161.118.179.19:8181"  # Dedicated base URL for File2Link streaming (optional, uses BASE_URL if not set)
-FILE2LINK_BIN_CHANNEL = -1002701891349  # REQUIRED: Private channel ID to store files for streaming (e.g., -1001234567890)
+FILE2LINK_BIN_CHANNEL = -1003065793292 # REQUIRED: Private channel ID to store files for streaming (e.g., -1001234567890)
 FILE2LINK_ALLOWED_TYPES = "video,audio,document,photo,animation,voice,video_note"  # Allowed media types for streaming
 
 # Forwarding Settings
