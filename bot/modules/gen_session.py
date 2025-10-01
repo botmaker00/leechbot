@@ -270,7 +270,7 @@ async def handle_phone_or_bot(_, message, user_id):
             name=f"session_{user_id}",
             api_id=session_state[user_id]["api_id"],
             api_hash=session_state[user_id]["api_hash"],
-            in_memory=True,
+            in_memory=False,
         )
 
         session_state[user_id]["client"] = client_instance
