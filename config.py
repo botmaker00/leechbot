@@ -1,5 +1,5 @@
 # REQUIRED CONFIG
-BOT_TOKEN = "7552035888:AAHC4Ikvo_t3hxtOY0tOC3aByUmK3bQfu0Q"  # Get this from @BotFather
+BOT_TOKEN = "7552035888:AAHCHMLosG5srDyEWtEAZCoBmzp90MG74lU"  # Get this from @BotFather
 OWNER_ID = 5741918628  # Your Telegram User ID (not username) as an integer
 TELEGRAM_API = 21518327  # Get this from my.telegram.org
 TELEGRAM_HASH = "e72f588b3e4763f01eecfc3c4aa7e8ac"  # Get this from my.telegram.org
