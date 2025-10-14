@@ -204,7 +204,7 @@ class RawByteStreamer:
 
                 if file_id.dc_id != await client.storage.dc_id():
                     try:
-                        auth_key = await Auth(client, file_id.dc_id, port, test_mode).create()
+                        auth_key = await Auth(client, file_id.dc_id, port).create()
                     except Exception as e:
                         logger.error(f"Failed to create auth key for DC {file_id.dc_id}: {e}")
                         raise
