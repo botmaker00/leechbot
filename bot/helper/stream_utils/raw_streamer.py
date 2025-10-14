@@ -178,11 +178,8 @@ class RawByteStreamer:
             media_session = client.media_sessions.get(file_id.dc_id, None)
 
             if media_session is None:
-                test_mode = await client.storage.test_mode()
-                if test_mode is None:
-                    logger.warning("Test mode not set, defaulting to False")
-                    test_mode = False
-
+                test_mode = False  # Explicitly set to False
+                logger.debug(f"Setting test_mode to False for DC {file_id.dc_id}")
                 # Try to resolve DC dynamically
                 try:
                     if hasattr(client, 'get_dc'):
