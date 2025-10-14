@@ -53,7 +53,7 @@ async def start_web_server_early():
     else:
         # Use Config.BASE_URL_PORT instead of environment variable
         # Explicitly convert to string to avoid any type issues
-        PORT = environ.get("PORT") or str(Config.BASE_URL_PORT) or "80"
+        PORT = environ.get("PORT") or str(Config.BASE_URL_PORT) or "8181"
         LOGGER.info(
             f"Starting web server early on port {PORT} for Heroku compatibility"
         )
