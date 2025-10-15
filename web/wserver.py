@@ -249,7 +249,7 @@ async def init_streaming_client(TgClient):
                 "workdir": session_dir,  # Use temporary directory for sessions
                 "parse_mode": enums.ParseMode.HTML,
                 "no_updates": True,  # Disable updates for web server client
-                "in_memory": False,  # Use in-memory session to avoid auth issues
+                "in_memory": True,  # Use in-memory session to avoid auth issues
             }
 
             # Add kurigram-specific parameters if supported
@@ -307,7 +307,7 @@ async def init_helper_bots_for_streaming(TgClient):
                     "workdir": session_dir,  # Use temporary directory for sessions
                     "parse_mode": enums.ParseMode.HTML,
                     "no_updates": True,
-                    "in_memory": False,  # Use in-memory session to avoid auth issues
+                    "in_memory": True,  # Use in-memory session to avoid auth issues
                 }
 
                 # Add kurigram-specific parameters if supported
