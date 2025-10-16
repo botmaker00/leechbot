@@ -171,11 +171,12 @@ def get_stream_utils():
     )
 
 
-def get_tg_client():
-    """Lazy import of TgClient to avoid startup delays"""
-    from bot.core.aeon_client import TgClient
-
-    return TgClient
+# This function is no longer needed as we are creating an independent client.
+# def get_tg_client():
+#     """Lazy import of TgClient to avoid startup delays"""
+#     from bot.core.aeon_client import TgClient
+#
+#     return TgClient
 
 
 async def get_file2link_bin_channel():
@@ -219,53 +220,28 @@ async def get_file2link_bin_channel():
         return None
 
 
-async def init_streaming_client(TgClient):
-    """Initialize Telegram clients for streaming (main bot + helper bots)"""
-    try:
-        # Initialize main bot client if not already initialized
-        if TgClient.bot is None:
-            from pyrogram import Client, enums
-            # Import library detection flag from aeon_client
-            from bot.core.aeon_client import USING_KURIGRAM
-            import os
+class WebStreamer:
+    _instance = None
+    _lock = asyncio.Lock()
+    bot = None
+    clients = {}
+    workload = {}
 
-            # Create a dedicated session directory for the web server
-            web_session_dir = "/usr/src/app/web_sessions"
-            os.makedirs(web_session_dir, exist_ok=True)
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(WebStreamer, cls).__new__(cls)
+        return cls._instance
 
-            TgClient.ID = Config.BOT_TOKEN.split(":", 1)[0]
+    @classmethod
+    async def get_instance(cls):
+        async with cls._lock:
+            if cls._instance is None:
+                cls._instance = WebStreamer()
+                await cls._instance.start_clients()
+            return cls._instance
 
-            client_args = {
-                "name": f"web_main_{TgClient.ID}",
-                "api_id": Config.TELEGRAM_API,
-                "api_hash": Config.TELEGRAM_HASH,
-                "proxy": Config.TG_PROXY,
-                "bot_token": Config.BOT_TOKEN,
-                "workdir": web_session_dir,
-                "parse_mode": enums.ParseMode.HTML,
-                "no_updates": True,
-            }
-
-            if USING_KURIGRAM:
-                client_args["max_concurrent_transmissions"] = 100
-
-            TgClient.bot = Client(**client_args)
-            await TgClient.bot.start()
-            TgClient.NAME = TgClient.bot.me.username
-
-        # Initialize helper bots for streaming if HELPER_TOKENS is available
-        if Config.HELPER_TOKENS and not TgClient.helper_bots:
-            await init_helper_bots_for_streaming(TgClient)
-
-    except Exception as e:
-        LOGGER.error(f"Failed to initialize streaming clients: {e}")
-        raise
-
-
-async def init_helper_bots_for_streaming(TgClient):
-    """Initialize helper bots specifically for web server streaming"""
-    try:
-        from asyncio import gather
+    async def start_clients(self):
+        LOGGER.info("Starting independent web server clients...")
         from pyrogram import Client, enums
         from bot.core.aeon_client import USING_KURIGRAM
         import os
@@ -273,47 +249,89 @@ async def init_helper_bots_for_streaming(TgClient):
         web_session_dir = "/usr/src/app/web_sessions"
         os.makedirs(web_session_dir, exist_ok=True)
 
-        if not hasattr(TgClient, "helper_bots"):
-            TgClient.helper_bots = {}
-        if not hasattr(TgClient, "helper_loads"):
-            TgClient.helper_loads = {}
+        bot_token = Config.BOT_TOKEN
+        if not bot_token:
+            LOGGER.error("BOT_TOKEN not found. Cannot start web server client.")
+            return
 
-        async def start_helper_bot(no, b_token):
-            try:
-                helper_args = {
-                    "name": f"web_helper{no}",
-                    "api_id": Config.TELEGRAM_API,
-                    "api_hash": Config.TELEGRAM_HASH,
-                    "proxy": Config.TG_PROXY,
-                    "bot_token": b_token,
-                    "workdir": web_session_dir,
-                    "parse_mode": enums.ParseMode.HTML,
-                    "no_updates": True,
-                }
-                if USING_KURIGRAM:
-                    helper_args["max_concurrent_transmissions"] = 20
+        client_id = int(bot_token.split(":", 1)[0])
+        client_args = {
+            "name": f"web_main_{client_id}",
+            "api_id": Config.TELEGRAM_API,
+            "api_hash": Config.TELEGRAM_HASH,
+            "proxy": Config.TG_PROXY,
+            "bot_token": bot_token,
+            "workdir": web_session_dir,
+            "parse_mode": enums.ParseMode.HTML,
+            "no_updates": True,
+        }
+        if USING_KURIGRAM:
+            client_args["max_concurrent_transmissions"] = 100
 
-                hbot = Client(**helper_args)
-                await hbot.start()
-                TgClient.helper_bots[no] = hbot
-                TgClient.helper_loads[no] = 0
-            except Exception as e:
-                LOGGER.error(f"Failed to start helper bot {no} for streaming: {e}")
-                TgClient.helper_bots.pop(no, None)
-                TgClient.helper_loads.pop(no, None)
+        try:
+            self.bot = Client(**client_args)
+            await self.bot.start()
+            self.clients[0] = self.bot
+            self.workload[0] = 0
+            LOGGER.info(f"Web server main client [@{self.bot.me.username}] started.")
+        except Exception as e:
+            LOGGER.error(f"Failed to start web server main client: {e}")
+            self.bot = None
 
-        await gather(
-            *(
-                start_helper_bot(no, b_token)
-                for no, b_token in enumerate(Config.HELPER_TOKENS.split(), start=1)
+        helper_tokens = Config.HELPER_TOKENS
+        if helper_tokens:
+            await gather(
+                *(
+                    self._start_helper(no, token, web_session_dir)
+                    for no, token in enumerate(helper_tokens.split(), start=1)
+                )
             )
-        )
-    except Exception as e:
-        LOGGER.error(f"Error initializing helper bots for streaming: {e}")
-        if not hasattr(TgClient, "helper_bots"):
-            TgClient.helper_bots = {}
-        if not hasattr(TgClient, "helper_loads"):
-            TgClient.helper_loads = {}
+
+    async def _start_helper(self, no, token, workdir):
+        from pyrogram import Client, enums
+        from bot.core.aeon_client import USING_KURIGRAM
+        try:
+            helper_args = {
+                "name": f"web_helper_{no}",
+                "api_id": Config.TELEGRAM_API,
+                "api_hash": Config.TELEGRAM_HASH,
+                "proxy": Config.TG_PROXY,
+                "bot_token": token,
+                "workdir": workdir,
+                "parse_mode": enums.ParseMode.HTML,
+                "no_updates": True,
+            }
+            if USING_KURIGRAM:
+                helper_args["max_concurrent_transmissions"] = 20
+
+            hbot = Client(**helper_args)
+            await hbot.start()
+            self.clients[no] = hbot
+            self.workload[no] = 0
+            LOGGER.info(f"Web server helper bot {no} [@{hbot.me.username}] started.")
+        except Exception as e:
+            LOGGER.error(f"Failed to start web server helper bot {no}: {e}")
+
+    async def stop_clients(self):
+        LOGGER.info("Stopping independent web server clients...")
+        if self.bot:
+            await self.bot.stop()
+        await gather(*[client.stop() for client in self.clients.values() if client != self.bot])
+        self.clients.clear()
+        self.workload.clear()
+        self.bot = None
+        LOGGER.info("Web server clients stopped.")
+
+    def get_client(self):
+        if not self.clients:
+            return None, None
+        client_id = min(self.workload, key=self.workload.get)
+        self.workload[client_id] += 1
+        return self.clients.get(client_id), client_id
+
+    def decrease_load(self, client_id):
+        if client_id in self.workload:
+            self.workload[client_id] -= 1
 
 
 async def validate_channel_access(client, channel_id):
@@ -360,91 +378,42 @@ SERVICES = {
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Initialize clients
+    # Initialize download clients
     app.state.aria2 = Aria2HttpClient("http://localhost:6800/jsonrpc")
     app.state.qbittorrent = await create_client("http://localhost:8090/api/v2/")
-
-    # For backward compatibility
-    global aria2, qbittorrent  # noqa: PLW0603
+    global aria2, qbittorrent
     aria2 = app.state.aria2
     qbittorrent = app.state.qbittorrent
 
-    # Initialize TgClient for File2Link functionality
-    try:
-        # Load database configuration first (primary source)
-        if _config_loader:
-            await _config_loader()
+    # Initialize WebStreamer for File2Link
+    if Config.FILE2LINK_ENABLED:
+        app.state.web_streamer = await WebStreamer.get_instance()
+        if not app.state.web_streamer.bot:
+             LOGGER.error("File2Link streaming will not work as the client failed to start.")
+    else:
+        app.state.web_streamer = None
 
-        TgClient = get_tg_client()
-
-        # Only initialize if File2Link is enabled
-        if Config.FILE2LINK_ENABLED:
-            # Initialize lightweight client for streaming (without database)
-            await init_streaming_client(TgClient)
-
-            # Validate FILE2LINK_BIN_CHANNEL configuration
-            bin_channel = getattr(Config, "FILE2LINK_BIN_CHANNEL", None)
-            if bin_channel and bin_channel != 0:
-                # Update Config object to ensure consistency
-                Config.FILE2LINK_BIN_CHANNEL = bin_channel
-
-                # Validate storage channel access
-                channel_access = await validate_channel_access(
-                    TgClient.bot, bin_channel
-                )
-                if not channel_access:
-                    LOGGER.error(
-                        "Storage channel access validation failed - File2Link streaming may not work"
-                    )
-                    LOGGER.error("Please ensure:")
-                    LOGGER.error(
-                        "1. FILE2LINK_BIN_CHANNEL is set to correct channel ID"
-                    )
-                    LOGGER.error("2. Bot is added to the channel")
-                    LOGGER.error("3. Bot has admin permissions in the channel")
-
-    except Exception as e:
-        LOGGER.error(f"Failed to initialize TgClient for web server: {e}")
-        LOGGER.warning(
-            "File2Link streaming will not work until TgClient is initialized"
-        )
-
-    try:
-        # Import garbage collection utilities
-        from bot.helper.ext_utils.gc_utils import smart_garbage_collection
-
-        app.state.gc_utils = smart_garbage_collection
-    except ImportError:
-        app.state.gc_utils = None
     yield
 
     # Properly close all connections
+    LOGGER.info("Shutting down web server and closing connections...")
     try:
         await app.state.aria2.close()
-        LOGGER.info("Aria2 client connection closed")
+        LOGGER.info("Aria2 client connection closed.")
     except Exception as e:
         LOGGER.error(f"Error closing Aria2 client: {e}")
 
     try:
         await app.state.qbittorrent.close()
-        LOGGER.info("qBittorrent client connection closed")
+        LOGGER.info("qBittorrent client connection closed.")
     except Exception as e:
         LOGGER.error(f"Error closing qBittorrent client: {e}")
 
-    # Close TgClient if it was initialized
-    try:
-        TgClient = get_tg_client()
-        if TgClient.bot is not None:
-            await TgClient.stop()
-            LOGGER.info("TgClient stopped for web server")
-    except Exception as e:
-        LOGGER.error(f"Error stopping TgClient: {e}")
-
-    # Force garbage collection
-    if app.state.gc_utils:
-        app.state.gc_utils(
-            aggressive=True
-        )  # Use aggressive mode for cleanup on shutdown
+    if app.state.web_streamer:
+        try:
+            await app.state.web_streamer.stop_clients()
+        except Exception as e:
+            LOGGER.error(f"Error stopping WebStreamer clients: {e}")
 
 
 app = FastAPI(lifespan=lifespan)
@@ -828,32 +797,20 @@ async def health_check():
                 "streaming_ready": False,
             }
 
-        # Check if bot client is available
-        client, client_id = StreamClientManager.get_optimal_client()
-        bot_ready = client is not None
-
-        # Check configuration
+        web_streamer = await WebStreamer.get_instance()
+        bot_ready = web_streamer.bot is not None
         config_ready = bool(Config.FILE2LINK_BIN_CHANNEL)
-
-        # Check channel access if bot is ready
         channel_access = False
         if bot_ready and config_ready:
             try:
                 channel_access = await validate_channel_access(
-                    client, Config.FILE2LINK_BIN_CHANNEL
+                    web_streamer.bot, Config.FILE2LINK_BIN_CHANNEL
                 )
             except Exception as e:
                 LOGGER.error(f"Error checking channel access in health check: {e}")
 
         streaming_ready = bot_ready and config_ready and channel_access
-
-        # Get client info for additional details
-        client_info = StreamClientManager.get_client_info() if bot_ready else {}
-
-        # Check hyperdl status
-        hyperdl_enabled = (
-            Config.HYPER_THREADS and client_info.get("helper_bots_count", 0) > 0
-        )
+        helper_bots_count = len(web_streamer.clients) - 1 if bot_ready else 0
 
         return {
             "status": "ok" if streaming_ready else "not_ready",
@@ -864,19 +821,10 @@ async def health_check():
             "channel_access": channel_access,
             "streaming_ready": streaming_ready,
             "bin_channel_configured": bool(Config.FILE2LINK_BIN_CHANNEL),
-            "bin_channel_id": (
-                Config.FILE2LINK_BIN_CHANNEL
-                if Config.FILE2LINK_BIN_CHANNEL
-                else None
-            ),
             "helper_tokens_configured": bool(Config.HELPER_TOKENS),
-            "total_clients": client_info.get("total_clients", 1),
-            "helper_bots_count": client_info.get("helper_bots_count", 0),
-            "workload_distribution": client_info.get(
-                "workload_distribution", {0: 0}
-            ),
-            "hyperdl_enabled": hyperdl_enabled,
-            "hyper_threads_config": Config.HYPER_THREADS,
+            "total_clients": len(web_streamer.clients),
+            "helper_bots_count": helper_bots_count,
+            "workload_distribution": web_streamer.workload,
         }
 
     except Exception as e:
@@ -999,57 +947,16 @@ async def stream_preview(path: str, request: Request):
                     detail="FILE2LINK_BIN_CHANNEL not configured. Please set a storage channel for File2Link streaming.",
                 )
 
-        # Try Raw API Streaming first
-        raw_streamer = create_raw_streamer(storage_channel)
+        web_streamer = await WebStreamer.get_instance()
+        if not web_streamer.bot:
+            raise HTTPException(status_code=503, detail="Web server client not available.")
 
-        if raw_streamer:
-            streamer = raw_streamer
-            # Get a client for message validation (Raw streamer manages its own clients for streaming)
-            client = next(iter(raw_streamer.clients.values()))
-            client_id = None
+        # Use the appropriate streamer based on available clients
+        if len(web_streamer.clients) > 1:
+            streamer = ParallelByteStreamer(web_streamer.clients, web_streamer.workload, chat_id=storage_channel)
         else:
-            # Fallback to existing streaming methods
-
-            # Check if parallel streaming is available
-            from bot.core.aeon_client import TgClient
-
-            effective_threads = Config.HYPER_THREADS or (
-                max(8, len(TgClient.helper_bots))
-                if hasattr(TgClient, "helper_bots") and TgClient.helper_bots
-                else 0
-            )
-
-            use_parallel = (
-                effective_threads > 0
-                and hasattr(TgClient, "helper_bots")
-                and TgClient.helper_bots
-                and len(TgClient.helper_bots) > 1
-            )
-
-            if use_parallel:
-                LOGGER.info(
-                    f"File2Link Stream - Using parallel streaming fallback for message {message_id}"
-                )
-                streamer = ParallelByteStreamer(chat_id=storage_channel)
-                # Get a client for hash validation when using parallel streaming
-                client, client_id = StreamClientManager.get_optimal_client()
-                if client is None:
-                    raise HTTPException(
-                        status_code=503,
-                        detail="Bot not initialized yet, please try again later",
-                    )
-            else:
-                # Fallback to single client streaming
-                LOGGER.info(
-                    f"File2Link Stream - Using single client streaming fallback for message {message_id}"
-                )
-                client, client_id = StreamClientManager.get_optimal_client()
-                if client is None:
-                    raise HTTPException(
-                        status_code=503,
-                        detail="Bot not initialized yet, please try again later",
-                    )
-                streamer = ByteStreamer(client, client_id, chat_id=storage_channel)
+            client, client_id = web_streamer.get_client()
+            streamer = ByteStreamer(client, client_id, chat_id=storage_channel)
 
         # Get file info (different approach for raw streamer)
         if isinstance(streamer, RawByteStreamer):
@@ -1242,67 +1149,25 @@ async def download_file(path: str, request: Request):
                     detail="FILE2LINK_BIN_CHANNEL not configured. Please set a storage channel for File2Link downloads.",
                 )
 
-        # Try Raw API Streaming first for downloads
-        raw_streamer = create_raw_streamer(storage_channel)
+        web_streamer = await WebStreamer.get_instance()
+        if not web_streamer.bot:
+            raise HTTPException(status_code=503, detail="Web server client not available.")
 
-        if raw_streamer:
-            # Get file info using raw streamer
-            try:
-                file_info = await raw_streamer.get_file_properties(message_id)
-                # Verify hash by getting the message
-                client = next(
-                    iter(raw_streamer.clients.values())
-                )  # Get any client for hash verification
-                stored_msg = await client.get_messages(storage_channel, message_id)
-                if not stored_msg or get_hash(stored_msg) != secure_hash:
-                    raise HTTPException(status_code=404, detail="Invalid file hash")
+        client, _ = web_streamer.get_client()
+        if not client:
+            raise HTTPException(status_code=503, detail="Could not get a client from the web streamer.")
 
-            except Exception:
-                raise HTTPException(status_code=404, detail="File not found")
+        stored_msg = await client.get_messages(storage_channel, message_id)
+        if not stored_msg or get_hash(stored_msg) != secure_hash:
+            raise HTTPException(status_code=404, detail="Invalid file hash or file not found.")
 
-            streamer = raw_streamer
-            hyperdl_available = False  # Skip HyperDL since we're using Raw API
+        from bot.helper.stream_utils.file_processor import get_file_info
+        file_info = get_file_info(stored_msg)
+        if not file_info:
+            raise HTTPException(status_code=404, detail="Could not get file info.")
 
-        else:
-            # Fallback to HyperDL/legacy methods
-
-            from bot.core.aeon_client import TgClient
-
-            # Check HyperDL availability (like hyperdl_utils.py)
-            effective_threads = Config.HYPER_THREADS or (
-                len(TgClient.helper_bots)
-                if hasattr(TgClient, "helper_bots") and TgClient.helper_bots
-                else 0
-            )
-
-            hyperdl_available = (
-                effective_threads > 0
-                and hasattr(TgClient, "helper_bots")
-                and TgClient.helper_bots
-                and len(TgClient.helper_bots) > 0
-            )
-
-            # Get a client for file validation
-            client, _ = StreamClientManager.get_optimal_client()
-            if client is None:
-                raise HTTPException(
-                    status_code=503,
-                    detail="Bot not initialized yet, please try again later",
-                )
-
-            # Verify file hash first
-            stored_msg = await client.get_messages(storage_channel, message_id)
-            if not stored_msg or get_hash(stored_msg) != secure_hash:
-                raise HTTPException(status_code=404, detail="Invalid file hash")
-
-            # Get file info
-            from bot.helper.stream_utils.file_processor import get_file_info
-
-            file_info = get_file_info(stored_msg)
-            if not file_info:
-                raise HTTPException(status_code=404, detail="File not found")
-
-            streamer = None  # Will be set in HyperDL logic if needed
+        hyperdl_available = len(web_streamer.clients) > 1
+        streamer = ParallelByteStreamer(web_streamer.clients, web_streamer.workload, chat_id=storage_channel) if hyperdl_available else ByteStreamer(client, _, chat_id=storage_channel)
 
         try:
             file_size = file_info.get("file_size", 0)
