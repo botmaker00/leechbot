@@ -17,7 +17,9 @@ from bot.helper.telegram_helper.message_utils import (
 )
 
 
-async def add_aria2_download(listener, dpath, header, ratio, seed_time):
+async def add_aria2_download(
+    listener, dpath, header, ratio, seed_time, compress=False
+):
     # Check if it's a torrent and if torrent operations are enabled
     is_torrent = listener.link.startswith("magnet:") or listener.link.endswith(
         ".torrent"
@@ -39,6 +41,7 @@ async def add_aria2_download(listener, dpath, header, ratio, seed_time):
         a2c_opt["seed-time"] = seed_time
     if TORRENT_TIMEOUT := Config.TORRENT_TIMEOUT:
         a2c_opt["bt-stop-timeout"] = f"{TORRENT_TIMEOUT}"
+    listener.compress = compress
 
     add_to_queue, event = await check_running_tasks(listener)
     if add_to_queue:

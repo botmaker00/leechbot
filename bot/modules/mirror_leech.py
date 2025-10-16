@@ -138,7 +138,6 @@ class Mirror(TaskListener):
             "-bt": False,
             "-ut": False,
             "-mt": False,
-            "-vt": False,
             "-merge-video": False,
             "-merge-audio": False,
             "-merge-subtitle": False,
@@ -386,8 +385,6 @@ class Mirror(TaskListener):
 
         if self.compress and is_flag_enabled("-z"):
             self.compression_enabled = True
-        else:
-            self.compression_enabled = False
         self.extract = args["-e"]
         # Enable extract_enabled if -e flag is set and archive flags are enabled
         if self.extract and is_flag_enabled("-e"):
@@ -447,12 +444,6 @@ class Mirror(TaskListener):
         self.as_doc = args["-doc"]
         self.as_med = args["-med"]
         self.media_tools = args["-mt"]
-        self.video_tools = args["-vt"]
-        if self.video_tools:
-            from bot.modules.tool_commands import handle_merge_tool
-
-            bot_loop.create_task(handle_merge_tool(self.message, self.client))
-            return
 
         # Register user as pending task user if -mt flag is used
         if self.media_tools:
@@ -1161,7 +1152,16 @@ class Mirror(TaskListener):
                         f"authorization: Basic {b64encode(auth.encode()).decode('ascii')}"
                     ]
                 )
-            create_task(add_aria2_download(self, path, headers, ratio, seed_time))
+            create_task(
+                add_aria2_download(
+                    self,
+                    path,
+                    headers,
+                    ratio,
+                    seed_time,
+                    self.compression_enabled,
+                )
+            )
         await delete_links(self.message)
         return None
 
