@@ -6,6 +6,9 @@ from asyncio import sleep
 from contextlib import asynccontextmanager
 from logging import INFO, WARNING, FileHandler, StreamHandler, basicConfig, getLogger
 from urllib.parse import urlparse
+import json
+import os
+import tempfile
 
 from aioaria2 import Aria2HttpClient  # type: ignore
 from aiohttp import ClientSession
@@ -231,19 +234,36 @@ async def init_streaming_client(TgClient):
             # Create main bot client with better session management
             TgClient.ID = Config.BOT_TOKEN.split(":", 1)[0]
 
+            # Load session string from shared config
+            session_string = None
+            config_file_path = os.path.join(
+                tempfile.gettempdir(), "aimleechbot_shared_config.json"
+            )
+            if os.path.exists(config_file_path):
+                with open(config_file_path) as f:
+                    shared_config = json.load(f)
+                    session_string = shared_config.get("sessions", {}).get(
+                        f"web_main_{TgClient.ID}"
+                    )
+
+            if not session_string:
+                LOGGER.error(
+                    f"Session string for main bot (web_main_{TgClient.ID}) not found. Streaming will fail."
+                )
+                return
+
             # Check if max_concurrent_transmissions is supported (kurigram vs pyrofork compatibility)
             client_params = list(
                 inspect.signature(Client.__init__).parameters.keys()
             )
             client_args = {
-                "name": f"web_main_{TgClient.ID}",  # Different session name to avoid conflicts
+                "name": f"web_main_{TgClient.ID}",
                 "api_id": Config.TELEGRAM_API,
                 "api_hash": Config.TELEGRAM_HASH,
                 "proxy": Config.TG_PROXY,
-                "bot_token": Config.BOT_TOKEN,
+                "session_string": session_string,
                 "parse_mode": enums.ParseMode.HTML,
-                "no_updates": True,  # Disable updates for web server client
-                "in_memory": True,
+                "no_updates": True,
             }
 
             # Add kurigram-specific parameters if supported
@@ -280,8 +300,27 @@ async def init_helper_bots_for_streaming(TgClient):
         if not hasattr(TgClient, "helper_loads"):
             TgClient.helper_loads = {}
 
+        # Load helper session strings from shared config
+        config_file_path = os.path.join(
+            tempfile.gettempdir(), "aimleechbot_shared_config.json"
+        )
+        if os.path.exists(config_file_path):
+            with open(config_file_path) as f:
+                shared_config = json.load(f)
+            helper_sessions = shared_config.get("sessions", {})
+        else:
+            helper_sessions = {}
+
         async def start_helper_bot(no, b_token):
             try:
+                session_name = f"web_helper{no}"
+                session_string = helper_sessions.get(session_name)
+                if not session_string:
+                    LOGGER.error(
+                        f"Session string for helper bot {session_name} not found. This helper will not be available."
+                    )
+                    return
+
                 # Check if max_concurrent_transmissions is supported (kurigram vs pyrofork compatibility)
                 import inspect
 
@@ -289,14 +328,13 @@ async def init_helper_bots_for_streaming(TgClient):
                     inspect.signature(Client.__init__).parameters.keys()
                 )
                 helper_args = {
-                    "name": f"web_helper{no}",  # Different session name for web server
+                    "name": session_name,
                     "api_id": Config.TELEGRAM_API,
                     "api_hash": Config.TELEGRAM_HASH,
                     "proxy": Config.TG_PROXY,
-                    "bot_token": b_token,
+                    "session_string": session_string,
                     "parse_mode": enums.ParseMode.HTML,
                     "no_updates": True,
-                    "in_memory": True,
                 }
 
                 # Add kurigram-specific parameters if supported
