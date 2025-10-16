@@ -1657,14 +1657,6 @@ Send one of the following position options:
             "DEBRID_LINK_API",
         ]
 
-        # Add File2Link settings to the config menu
-        file2link_keys = [
-            "FILE2LINK_ENABLED",
-            "FILE2LINK_BIN_CHANNEL",
-            "FILE2LINK_BASE_URL",
-            "FILE2LINK_ALLOWED_TYPES",
-        ]
-
         # Add module control settings to the config menu
         module_keys = [
             "AI_ENABLED",
@@ -1698,7 +1690,6 @@ Send one of the following position options:
             "NZB_ENABLED": "Enable NZB Operations",
             "JD_ENABLED": "Enable JDownloader Operations",
             "RCLONE_ENABLED": "Enable Rclone Operations",
-            "FILE2LINK_ENABLED": "Enable File2Link streaming and download links",
             # Removed MEDIA_TOOLS_ENABLED description
         }
 
@@ -1711,11 +1702,6 @@ Send one of the following position options:
         for ak in api_keys:
             if ak not in filtered_keys:
                 filtered_keys.append(ak)
-
-        # Ensure File2Link keys are in the filtered keys list
-        for f2k in file2link_keys:
-            if f2k not in filtered_keys:
-                filtered_keys.append(f2k)
 
         # Ensure module keys are in the filtered keys list
         for mk in module_keys:
@@ -1738,9 +1724,6 @@ Send one of the following position options:
             # Highlight API settings
             elif k in api_keys:
                 buttons.data_button(f"🔌 {k}", callback)
-            # Highlight File2Link settings
-            elif k in file2link_keys:
-                buttons.data_button(f"🔗 {k}", callback)
             # Highlight module control settings
             elif k in module_keys:
                 # Use the module descriptions for better display
@@ -9312,7 +9295,6 @@ async def edit_variable(_, message, pre_message, key):
         "TASK_MONITOR_CPU_LOW",
         "TASK_MONITOR_MEMORY_HIGH",
         "TASK_MONITOR_MEMORY_LOW",
-        "FILE2LINK_BIN_CHANNEL",
     }:
         try:
             value = int(value)
@@ -9472,13 +9454,13 @@ async def edit_variable(_, message, pre_message, key):
         except ValueError:
             value = 3  # Default to 3 seconds if invalid input
     elif key in {"LOGIN_PASS", "DEBRID_LINK_API"}:
-        value = str(value)
-    elif value.isdigit():
-        value = int(value)
-    elif (value.startswith("[") and value.endswith("]")) or (
-        value.startswith("{") and value.endswith("}")
-    ):
-        value = eval(value)
+            value = str(value)
+        elif value.isdigit():
+            value = int(value)
+        elif (value.startswith("[") and value.endswith("]")) or (
+            value.startswith("{") and value.endswith("}")
+        ):
+            value = eval(value)
     Config.set(key, value)
 
     # Determine which menu to return to based on the key

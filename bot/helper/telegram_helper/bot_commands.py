@@ -85,7 +85,6 @@ class BotCommands:
     # Scraping Commands
     ScrapCommand = f"scrap{i}"
     # File2Link Commands
-    File2LinkCommand = [f"file2link{i}", f"f2l{i}"]
     # Cat API Commands
     NekoCommand = f"neko{i}"
     # Trace.moe Commands

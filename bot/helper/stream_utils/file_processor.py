@@ -180,58 +180,6 @@ def validate_media_type(message: Message) -> tuple[bool, str]:
     return True, ""
 
 
-def validate_file2link_media(message: Message) -> tuple[bool, str]:
-    """
-    Validate media for File2Link functionality (no file size limit)
-    File2Link only copies files to storage channel, so size limits don't apply
-
-    Returns:
-        tuple: (is_valid, error_message)
-    """
-    media = get_media(message)
-    if not media:
-        return False, "No media found in message"
-
-    # Check if media type is supported for streaming
-    # Determine media type by checking which attribute is present in the message
-    media_type = None
-    for attr in (
-        "video",
-        "animation",
-        "audio",
-        "voice",
-        "video_note",
-        "document",
-        "photo",
-    ):
-        if hasattr(message, attr) and getattr(message, attr) is not None:
-            media_type = attr
-            break
-
-    if not media_type:
-        return False, "Unable to determine media type"
-
-    # Get allowed types from config
-    from bot.core.config_manager import Config
-
-    allowed_types = [
-        t.strip().lower() for t in Config.FILE2LINK_ALLOWED_TYPES.split(",")
-    ]
-
-    if media_type not in allowed_types:
-        supported_types = ", ".join(allowed_types)
-        return (
-            False,
-            f"Media type '{media_type}' not supported. Supported: {supported_types}",
-        )
-
-    # For File2Link, we don't enforce file size limits since files are just copied to storage
-    # The actual streaming will be handled by Telegram's servers
-    file_size = get_fsize(message)
-    if file_size == 0:
-        return False, "Unable to determine file size"
-
-    return True, ""
 
 
 def get_media_type_tag(message: Message) -> str:

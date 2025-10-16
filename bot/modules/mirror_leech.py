@@ -1,7 +1,11 @@
 # ruff: noqa: RUF006
-from asyncio import create_task
+from asyncio import create_task, sleep
 from base64 import b64encode
 from re import match as re_match
+from time import time
+
+from pyrogram.filters import create
+from pyrogram.handlers import MessageHandler
 
 from bot import DOWNLOAD_DIR, LOGGER, bot_loop, task_dict_lock
 from bot.core.aeon_client import TgClient
@@ -64,6 +68,43 @@ from bot.helper.telegram_helper.message_utils import (
 )
 from bot.modules.media_tools import show_media_tools_for_task
 
+leech_handler_dict = {}
+
+
+async def _wait_for_reply(client, query_message, user_id, timeout=120):
+    chat_id = query_message.chat.id
+    handler_key = (chat_id, user_id)
+    leech_handler_dict[handler_key] = None
+
+    def event_filter(_, __, event):
+        return (
+            event.from_user
+            and event.from_user.id == user_id
+            and event.chat.id == chat_id
+            and event.reply_to_message
+            and event.reply_to_message.id == query_message.id
+        )
+
+    async def __pfunc(_, message):
+        leech_handler_dict[handler_key] = message
+
+    handler = client.add_handler(
+        MessageHandler(__pfunc, filters=create(event_filter)),
+        group=-1,
+    )
+
+    start_time = time()
+    while leech_handler_dict.get(handler_key) is None:
+        await sleep(0.5)
+        if time() - start_time > timeout:
+            break
+
+    client.remove_handler(*handler)
+    response = leech_handler_dict.get(handler_key)
+    if handler_key in leech_handler_dict:
+        del leech_handler_dict[handler_key]
+    return response
+
 
 class Mirror(TaskListener):
     def __init__(
@@ -95,6 +136,126 @@ class Mirror(TaskListener):
         self.is_jd = is_jd
         self.is_nzb = is_nzb
 
+    async def video_tools_workflow(self):
+        user_id = self.message.from_user.id
+
+        question = "How many files to process? Send a number in reply."
+        q_msg = await send_message(self.message, question)
+
+        response_msg = await _wait_for_reply(self.client, q_msg, user_id)
+
+        if not response_msg:
+            await delete_message(q_msg)
+            await send_message(self.message, "No reply within 2 minutes. Aborting.")
+            return
+
+        await delete_message(q_msg)
+
+        if not response_msg.text or not response_msg.text.isdigit():
+            await send_message(
+                self.message,
+                "Invalid number or not a text reply. Aborting.",
+            )
+            await delete_message(response_msg)
+            return
+
+        num_files = int(response_msg.text)
+        await delete_message(response_msg)
+
+        if num_files <= 0:
+            await send_message(self.message, "Number of files must be positive. Aborting.")
+            return
+
+        if not self.folder_name:
+            self.folder_name = f"/vt_{self.mid}"
+
+        async with task_dict_lock:
+            if self.folder_name.strip("/") in self.same_dir:
+                self.same_dir[self.folder_name.strip("/")]["total"] += num_files
+            else:
+                self.same_dir[self.folder_name.strip("/")] = {
+                    "total": num_files,
+                    "tasks": set(),
+                }
+
+        for i in range(num_files):
+            q_msg = await send_message(
+                self.message,
+                f"Please send file {i+1}/{num_files} in reply. You have 2 minutes.",
+            )
+            file_msg = await _wait_for_reply(self.client, q_msg, user_id)
+            await delete_message(q_msg)
+
+            if not file_msg:
+                await send_message(self.message, f"No reply for item {i+1}. Aborting.")
+                return
+
+            if not file_msg.media:
+                await send_message(
+                    self.message,
+                    f"No file sent for item {i+1}. Aborting.",
+                )
+                await delete_message(file_msg)
+                return
+
+            new_listener = Mirror(
+                client=self.client,
+                message=self.message,
+                is_qbit=self.is_qbit,
+                is_leech=self.is_leech,
+                is_jd=self.is_jd,
+                is_nzb=self.is_nzb,
+                same_dir=self.same_dir,
+                bulk=[],
+                multi_tag=self.multi_tag,
+                options=self.options,
+            )
+
+            new_listener.select = self.select
+            new_listener.seed = self.seed
+            new_listener.name = self.name
+            new_listener.up_dest = self.up_dest
+            new_listener.rc_flags = self.rc_flags
+            new_listener.compress = self.compress
+            new_listener.extract = self.extract
+            new_listener.join = self.join
+            new_listener.thumb = self.thumb
+            new_listener.split_size = self.split_size
+            new_listener.sample_video = self.sample_video
+            new_listener.screen_shots = self.screen_shots
+            new_listener.force_run = self.force_run
+            new_listener.force_download = self.force_download
+            new_listener.force_upload = self.force_upload
+            new_listener.as_doc = self.as_doc
+            new_listener.as_med = self.as_med
+            new_listener.media_tools = self.media_tools
+            new_listener.user_dict = self.user_dict
+            new_listener.user = self.user
+            new_listener.folder_name = self.folder_name
+
+            await new_listener.before_start()
+
+            path = f"{DOWNLOAD_DIR}{new_listener.mid}{new_listener.folder_name}"
+
+            async with task_dict_lock:
+                self.same_dir[self.folder_name.strip("/")]["tasks"].add(
+                    new_listener.mid,
+                )
+
+            create_task(
+                TelegramDownloadHelper(new_listener).add_download(
+                    file_msg,
+                    f"{path}/",
+                    self.client,
+                ),
+            )
+            await delete_message(file_msg)
+
+        await send_message(
+            self.message,
+            f"Started processing {num_files} files into folder <code>{self.folder_name.strip('/')}</code>.",
+        )
+
     async def new_event(self):
         # Ensure user_dict is never None to prevent AttributeError
         self._ensure_user_dict()
@@ -106,7 +267,7 @@ class Mirror(TaskListener):
             or self.message.text is None
         ):
             LOGGER.error(
-                "Message text is None or message doesn't have text attribute"
+                "Message text is None or message doesn't have text attribute",
             )
             error_msg = "Invalid message format. Please make sure your message contains text."
             error = await send_message(self.message, error_msg)
@@ -138,6 +299,7 @@ class Mirror(TaskListener):
             "-bt": False,
             "-ut": False,
             "-mt": False,
+            "-vt": False,
             "-merge-video": False,
             "-merge-audio": False,
             "-merge-subtitle": False,
@@ -255,6 +417,12 @@ class Mirror(TaskListener):
         # Parse arguments from the command
         arg_parser(input_list[1:], args)
 
+        self.video_tools = args["-vt"]
+
+        if self.video_tools:
+            bot_loop.create_task(self.video_tools_workflow())
+            return
+
         # Check if media tools flags are enabled
         from bot.helper.ext_utils.bot_utils import is_flag_enabled
 
@@ -279,7 +447,8 @@ class Mirror(TaskListener):
         if not self.is_leech:
             # Check user's DEFAULT_UPLOAD setting first, then fall back to global setting
             user_default_upload = self.user_dict.get(
-                "DEFAULT_UPLOAD", Config.DEFAULT_UPLOAD
+                "DEFAULT_UPLOAD",
+                Config.DEFAULT_UPLOAD,
             )
             if user_default_upload == "gd" and not self.up_dest:
                 self.up_dest = "gd"
@@ -346,7 +515,7 @@ class Mirror(TaskListener):
                         await self.remove_from_same_dir()
                         return None
                     if isinstance(selected_path, str) and selected_path.startswith(
-                        "❌"
+                        "❌",
                     ):
                         # Error occurred
                         await send_message(self.message, selected_path)
@@ -674,20 +843,20 @@ class Mirror(TaskListener):
                                 and preset_name in Config.FFMPEG_CMDS
                             ):
                                 self.ffmpeg_cmds.append(
-                                    Config.FFMPEG_CMDS[preset_name]
+                                    Config.FFMPEG_CMDS[preset_name],
                                 )
                                 LOGGER.info(
-                                    f"Added FFmpeg command from owner config: {preset_name}"
+                                    f"Added FFmpeg command from owner config: {preset_name}",
                                 )
                             elif (
                                 self.user_dict.get("FFMPEG_CMDS")
                                 and preset_name in self.user_dict["FFMPEG_CMDS"]
                             ):
                                 self.ffmpeg_cmds.append(
-                                    self.user_dict["FFMPEG_CMDS"][preset_name]
+                                    self.user_dict["FFMPEG_CMDS"][preset_name],
                                 )
                                 LOGGER.info(
-                                    f"Added FFmpeg command from user config: {preset_name}"
+                                    f"Added FFmpeg command from user config: {preset_name}",
                                 )
                             else:
                                 # If not found as preset, treat as direct command
@@ -695,7 +864,7 @@ class Mirror(TaskListener):
 
                                 self.ffmpeg_cmds.append(shlex.split(preset_name))
                                 LOGGER.info(
-                                    f"Added direct FFmpeg command: {preset_name}"
+                                    f"Added direct FFmpeg command: {preset_name}",
                                 )
                     # Single preset or command
                     # Check if it's a key in the FFmpeg commands dictionary
@@ -709,17 +878,17 @@ class Mirror(TaskListener):
                         if Config.FFMPEG_CMDS and args["-ff"] in Config.FFMPEG_CMDS:
                             self.ffmpeg_cmds = [Config.FFMPEG_CMDS[args["-ff"]]]
                             LOGGER.info(
-                                f"Using FFmpeg command key from owner config: {self.ffmpeg_cmds}"
+                                f"Using FFmpeg command key from owner config: {self.ffmpeg_cmds}",
                             )
                         elif (
                             self.user_dict.get("FFMPEG_CMDS")
                             and args["-ff"] in self.user_dict["FFMPEG_CMDS"]
                         ):
                             self.ffmpeg_cmds = [
-                                self.user_dict["FFMPEG_CMDS"][args["-ff"]]
+                                self.user_dict["FFMPEG_CMDS"][args["-ff"]],
                             ]
                             LOGGER.info(
-                                f"Using FFmpeg command key from user config: {self.ffmpeg_cmds}"
+                                f"Using FFmpeg command key from user config: {self.ffmpeg_cmds}",
                             )
                     else:
                         # If it's not a key, treat it as a direct command
@@ -727,7 +896,7 @@ class Mirror(TaskListener):
 
                         self.ffmpeg_cmds = [shlex.split(args["-ff"])]
                         LOGGER.info(
-                            f"Using direct FFmpeg command: {self.ffmpeg_cmds}"
+                            f"Using direct FFmpeg command: {self.ffmpeg_cmds}",
                         )
                 elif isinstance(args["-ff"], set):
                     # If it's already a set, convert to list for sequential processing
@@ -779,7 +948,7 @@ class Mirror(TaskListener):
                         self.ffmpeg_cmds = [shlex.split(str(evaluated_cmds))]
 
                     LOGGER.info(
-                        f"Using evaluated FFmpeg commands: {self.ffmpeg_cmds}"
+                        f"Using evaluated FFmpeg commands: {self.ffmpeg_cmds}",
                     )
         except Exception as e:
             self.ffmpeg_cmds = None
@@ -801,7 +970,8 @@ class Mirror(TaskListener):
         # Check if bulk operations are enabled in the configuration
         if is_bulk and not Config.BULK_ENABLED:
             await send_message(
-                self.message, "❌ Bulk operations are disabled by the administrator."
+                self.message,
+                "❌ Bulk operations are disabled by the administrator.",
             )
             is_bulk = False
 
@@ -930,7 +1100,7 @@ class Mirror(TaskListener):
                 # Check if torrent operations are enabled
                 if not Config.TORRENT_ENABLED:
                     await self.on_download_error(
-                        "❌ Torrent operations are disabled by the administrator."
+                        "❌ Torrent operations are disabled by the administrator.",
                     )
                     return None
                 self.is_qbit = True
@@ -966,10 +1136,12 @@ class Mirror(TaskListener):
         # Mega links are now supported natively, no need to force JDownloader
 
         # Check if media tools flag is set
-        if self.media_tools or self.video_tools:
+        if self.media_tools:
             # Show media tools settings and wait for user to click Done or timeout
             proceed = await show_media_tools_for_task(
-                self.client, self.message, self, is_vt_parent=self.video_tools
+                self.client,
+                self.message,
+                self,
             )
             if not proceed:
                 # User cancelled or timeout occurred
@@ -995,7 +1167,9 @@ class Mirror(TaskListener):
         except Exception as e:
             # Convert exception to string to avoid TypeError in send_message
             error_msg = (
-                str(e) if e else "An unknown error occurred during initialization"
+                str(e)
+                if e
+                else "An unknown error occurred during initialization"
             )
             x = await send_message(self.message, error_msg)
             await self.remove_from_same_dir()
@@ -1045,7 +1219,9 @@ class Mirror(TaskListener):
             ):
                 try:
                     self.link = await sync_to_async(
-                        direct_link_generator, self.link, self.user_id
+                        direct_link_generator,
+                        self.link,
+                        self.user_id,
                     )
                     if isinstance(self.link, tuple):
                         self.link, headers = self.link
@@ -1057,7 +1233,7 @@ class Mirror(TaskListener):
                         # Improve error messaging for unsupported sites
                         if "No Direct link function found" in e:
                             LOGGER.info(
-                                f"No direct link function found for {self.link}. Trying alternative download methods."
+                                f"No direct link function found for {self.link}. Trying alternative download methods.",
                             )
                         elif "ERROR: Invalid URL" in e:
                             LOGGER.warning(f"Invalid URL format: {self.link}")
@@ -1126,7 +1302,7 @@ class Mirror(TaskListener):
             # Check if Rclone operations are enabled in the configuration
             if not Config.RCLONE_ENABLED:
                 await self.on_download_error(
-                    "❌ Rclone operations are disabled by the administrator."
+                    "❌ Rclone operations are disabled by the administrator.",
                 )
                 return None
             create_task(add_rclone_download(self, f"{path}/"))
@@ -1149,19 +1325,10 @@ class Mirror(TaskListener):
                 auth = f"{ussr}:{pssw}"
                 headers.extend(
                     [
-                        f"authorization: Basic {b64encode(auth.encode()).decode('ascii')}"
-                    ]
+                        f"authorization: Basic {b64encode(auth.encode()).decode('ascii')}",
+                    ],
                 )
-            create_task(
-                add_aria2_download(
-                    self,
-                    path,
-                    headers,
-                    ratio,
-                    seed_time,
-                    self.compression_enabled,
-                )
-            )
+            create_task(add_aria2_download(self, path, headers, ratio, seed_time))
         await delete_links(self.message)
         return None
 
@@ -1200,7 +1367,7 @@ class Mirror(TaskListener):
 
             # Start streamrip download with selected quality and codec
             create_task(
-                add_streamrip_download(self, self.link, quality, codec, False)
+                add_streamrip_download(self, self.link, quality, codec, False),
             )
 
         except Exception as e:
@@ -1218,7 +1385,8 @@ async def mirror(client, message):
         or (Config.MEGA_ENABLED and Config.MEGA_UPLOAD_ENABLED)
     ):
         await send_message(
-            message, "❌ All upload services are disabled by the administrator."
+            message,
+            "❌ All upload services are disabled by the administrator.",
         )
         return
     bot_loop.create_task(Mirror(client, message).new_event())
@@ -1228,7 +1396,8 @@ async def leech(client, message):
     # Check if leech operations are enabled in the configuration
     if not Config.LEECH_ENABLED:
         await send_message(
-            message, "❌ Leech operations are disabled by the administrator."
+            message,
+            "❌ Leech operations are disabled by the administrator.",
         )
         return
     bot_loop.create_task(Mirror(client, message, is_leech=True).new_event())
@@ -1244,13 +1413,15 @@ async def jd_mirror(client, message):
         or (Config.MEGA_ENABLED and Config.MEGA_UPLOAD_ENABLED)
     ):
         await send_message(
-            message, "❌ All upload services are disabled by the administrator."
+            message,
+            "❌ All upload services are disabled by the administrator.",
         )
         return
     # Check if JDownloader operations are enabled in the configuration
     if not Config.JD_ENABLED:
         await send_message(
-            message, "❌ JDownloader operations are disabled by the administrator."
+            message,
+            "❌ JDownloader operations are disabled by the administrator.",
         )
         return
     bot_loop.create_task(Mirror(client, message, is_jd=True).new_event())
@@ -1266,13 +1437,15 @@ async def nzb_mirror(client, message):
         or (Config.MEGA_ENABLED and Config.MEGA_UPLOAD_ENABLED)
     ):
         await send_message(
-            message, "❌ All upload services are disabled by the administrator."
+            message,
+            "❌ All upload services are disabled by the administrator.",
         )
         return
     # Check if NZB operations are enabled in the configuration
     if not Config.NZB_ENABLED:
         await send_message(
-            message, "❌ NZB operations are disabled by the administrator."
+            message,
+            "❌ NZB operations are disabled by the administrator.",
         )
         return
     bot_loop.create_task(Mirror(client, message, is_nzb=True).new_event())
@@ -1282,13 +1455,15 @@ async def jd_leech(client, message):
     # Check if leech operations are enabled in the configuration
     if not Config.LEECH_ENABLED:
         await send_message(
-            message, "❌ Leech operations are disabled by the administrator."
+            message,
+            "❌ Leech operations are disabled by the administrator.",
         )
         return
     # Check if JDownloader operations are enabled in the configuration
     if not Config.JD_ENABLED:
         await send_message(
-            message, "❌ JDownloader operations are disabled by the administrator."
+            message,
+            "❌ JDownloader operations are disabled by the administrator.",
         )
         return
     bot_loop.create_task(
@@ -1300,13 +1475,15 @@ async def nzb_leech(client, message):
     # Check if leech operations are enabled in the configuration
     if not Config.LEECH_ENABLED:
         await send_message(
-            message, "❌ Leech operations are disabled by the administrator."
+            message,
+            "❌ Leech operations are disabled by the administrator.",
         )
         return
     # Check if NZB operations are enabled in the configuration
     if not Config.NZB_ENABLED:
         await send_message(
-            message, "❌ NZB operations are disabled by the administrator."
+            message,
+            "❌ NZB operations are disabled by the administrator.",
         )
         return
     bot_loop.create_task(

@@ -7,7 +7,6 @@ from .file_processor import (
     get_hash,
     get_media,
     is_streamable_file,
-    validate_file2link_media,
     validate_media_type,
 )
 from .link_generator import (
@@ -36,7 +35,6 @@ __all__ = [
     "get_media",
     "get_mime_type",
     "is_streamable_file",
-    "validate_file2link_media",
     "validate_media_type",
     "validate_stream_request",
 ]

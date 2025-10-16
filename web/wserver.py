@@ -49,16 +49,6 @@ try:
     importlib.reload(config_manager)
     from bot.core.config_manager import Config as ReloadedConfig
 
-    # Use reloaded config if it has different values
-    if (
-        hasattr(ReloadedConfig, "FILE2LINK_BIN_CHANNEL")
-        and ReloadedConfig.FILE2LINK_BIN_CHANNEL
-    ):
-        Config.FILE2LINK_BIN_CHANNEL = ReloadedConfig.FILE2LINK_BIN_CHANNEL
-        Config.FILE2LINK_ENABLED = getattr(
-            ReloadedConfig, "FILE2LINK_ENABLED", False
-        )
-
     # Load database settings asynchronously when needed
     import asyncio
     import os
@@ -90,45 +80,8 @@ try:
             except Exception as e:
                 LOGGER.warning(f"Failed to load shared configuration: {e}")
 
-            # Database settings are already loaded in the main bot process
-            # Web server doesn't need to reload user data
-
-            # Debug configuration values after database loading
-            db_bin_channel = getattr(Config, "FILE2LINK_BIN_CHANNEL", 0)
-            getattr(Config, "FILE2LINK_ENABLED", False)
-            getattr(Config, "FILE2LINK_BASE_URL", "")
-
-            # If database doesn't have the value (still 0), try environment variable as fallback
-            if db_bin_channel == 0:
-                env_bin_channel = os.getenv("FILE2LINK_BIN_CHANNEL")
-
-                if env_bin_channel and env_bin_channel != "0":
-                    try:
-                        Config.FILE2LINK_BIN_CHANNEL = int(env_bin_channel)
-
-                    except ValueError:
-                        LOGGER.error(f"Invalid environment value: {env_bin_channel}")
-                else:
-                    LOGGER.warning(
-                        "No valid FILE2LINK_BIN_CHANNEL found in database or environment"
-                    )
-            else:
-                # Update Config object with database value
-                Config.FILE2LINK_BIN_CHANNEL = db_bin_channel
-
         except Exception as e:
             LOGGER.error(f"Failed to load database settings: {e}")
-            # Fallback to environment if database loading fails
-
-            env_bin_channel = os.getenv("FILE2LINK_BIN_CHANNEL")
-            if env_bin_channel and env_bin_channel != "0":
-                try:
-                    Config.FILE2LINK_BIN_CHANNEL = int(env_bin_channel)
-
-                except ValueError:
-                    LOGGER.error(
-                        f"Invalid emergency fallback value: {env_bin_channel}"
-                    )
 
     # Store the config loading function for later use
     _config_loader = load_web_server_config
@@ -137,229 +90,6 @@ try:
 except Exception as e:
     LOGGER.error(f"Failed to load configuration for web server: {e}")
     _config_loader = None
-
-
-# Lazy imports for File2Link to avoid startup delays
-def get_stream_utils():
-    """Lazy import of stream utilities to avoid startup delays"""
-    from bot.helper.stream_utils import (
-        ByteStreamer,
-        ParallelByteStreamer,
-        ParallelDownloader,
-        RawByteStreamer,
-        StreamClientManager,
-        create_raw_streamer,
-        get_fname,
-        get_hash,
-        get_mime_type,
-        is_streamable_file,
-        validate_stream_request,
-    )
-
-    return (
-        StreamClientManager,
-        ByteStreamer,
-        ParallelByteStreamer,
-        ParallelDownloader,
-        RawByteStreamer,
-        create_raw_streamer,
-        get_hash,
-        get_fname,
-        validate_stream_request,
-        get_mime_type,
-        is_streamable_file,
-    )
-
-
-# This function is no longer needed as we are creating an independent client.
-# def get_tg_client():
-#     """Lazy import of TgClient to avoid startup delays"""
-#     from bot.core.aeon_client import TgClient
-#
-#     return TgClient
-
-
-async def get_file2link_bin_channel():
-    """Get FILE2LINK_BIN_CHANNEL from database or config"""
-    try:
-        # First try Config object
-        config_value = getattr(Config, "FILE2LINK_BIN_CHANNEL", None)
-        if config_value and config_value != 0:
-            return config_value
-
-        # If Config doesn't have it, try database directly
-        from bot.core.aeon_client import TgClient
-        from bot.helper.ext_utils.db_handler import database
-
-        if not database._return and database.db is not None:
-            db_config = await database.db.settings.config.find_one(
-                {"_id": TgClient.ID}, {"_id": 0}
-            )
-            if db_config:
-                bin_channel = db_config.get("FILE2LINK_BIN_CHANNEL")
-                if bin_channel and bin_channel != 0:
-                    # Update Config object for future use
-                    Config.FILE2LINK_BIN_CHANNEL = bin_channel
-                    return bin_channel
-
-        # Fallback to environment
-        import os
-
-        env_channel = os.getenv("FILE2LINK_BIN_CHANNEL")
-        if env_channel and env_channel != "0":
-            try:
-                channel_id = int(env_channel)
-                Config.FILE2LINK_BIN_CHANNEL = channel_id
-                return channel_id
-            except ValueError:
-                pass
-
-        return None
-    except Exception as e:
-        LOGGER.error(f"Error getting FILE2LINK_BIN_CHANNEL: {e}")
-        return None
-
-
-class WebStreamer:
-    _instance = None
-    _lock = asyncio.Lock()
-    bot = None
-    clients = {}
-    workload = {}
-
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super(WebStreamer, cls).__new__(cls)
-        return cls._instance
-
-    @classmethod
-    async def get_instance(cls):
-        async with cls._lock:
-            if cls._instance is None:
-                cls._instance = WebStreamer()
-                await cls._instance.start_clients()
-            return cls._instance
-
-    async def start_clients(self):
-        LOGGER.info("Starting independent web server clients...")
-        from pyrogram import Client, enums
-        from bot.core.aeon_client import USING_KURIGRAM
-        import os
-
-        web_session_dir = "/usr/src/app/web_sessions"
-        os.makedirs(web_session_dir, exist_ok=True)
-
-        bot_token = Config.BOT_TOKEN
-        if not bot_token:
-            LOGGER.error("BOT_TOKEN not found. Cannot start web server client.")
-            return
-
-        client_id = int(bot_token.split(":", 1)[0])
-        client_args = {
-            "name": f"web_main_{client_id}",
-            "api_id": Config.TELEGRAM_API,
-            "api_hash": Config.TELEGRAM_HASH,
-            "proxy": Config.TG_PROXY,
-            "bot_token": bot_token,
-            "workdir": web_session_dir,
-            "parse_mode": enums.ParseMode.HTML,
-            "no_updates": True,
-        }
-        if USING_KURIGRAM:
-            client_args["max_concurrent_transmissions"] = 100
-
-        try:
-            self.bot = Client(**client_args)
-            await self.bot.start()
-            self.clients[0] = self.bot
-            self.workload[0] = 0
-            LOGGER.info(f"Web server main client [@{self.bot.me.username}] started.")
-        except Exception as e:
-            LOGGER.error(f"Failed to start web server main client: {e}")
-            self.bot = None
-
-        helper_tokens = Config.HELPER_TOKENS
-        if helper_tokens:
-            await gather(
-                *(
-                    self._start_helper(no, token, web_session_dir)
-                    for no, token in enumerate(helper_tokens.split(), start=1)
-                )
-            )
-
-    async def _start_helper(self, no, token, workdir):
-        from pyrogram import Client, enums
-        from bot.core.aeon_client import USING_KURIGRAM
-        try:
-            helper_args = {
-                "name": f"web_helper_{no}",
-                "api_id": Config.TELEGRAM_API,
-                "api_hash": Config.TELEGRAM_HASH,
-                "proxy": Config.TG_PROXY,
-                "bot_token": token,
-                "workdir": workdir,
-                "parse_mode": enums.ParseMode.HTML,
-                "no_updates": True,
-            }
-            if USING_KURIGRAM:
-                helper_args["max_concurrent_transmissions"] = 20
-
-            hbot = Client(**helper_args)
-            await hbot.start()
-            self.clients[no] = hbot
-            self.workload[no] = 0
-            LOGGER.info(f"Web server helper bot {no} [@{hbot.me.username}] started.")
-        except Exception as e:
-            LOGGER.error(f"Failed to start web server helper bot {no}: {e}")
-
-    async def stop_clients(self):
-        LOGGER.info("Stopping independent web server clients...")
-        if self.bot:
-            await self.bot.stop()
-        await gather(*[client.stop() for client in self.clients.values() if client != self.bot])
-        self.clients.clear()
-        self.workload.clear()
-        self.bot = None
-        LOGGER.info("Web server clients stopped.")
-
-    def get_client(self):
-        if not self.clients:
-            return None, None
-        client_id = min(self.workload, key=self.workload.get)
-        self.workload[client_id] += 1
-        return self.clients.get(client_id), client_id
-
-    def decrease_load(self, client_id):
-        if client_id in self.workload:
-            self.workload[client_id] -= 1
-
-
-async def validate_channel_access(client, channel_id):
-    """Validate if bot has access to the storage channel"""
-    try:
-        # Try to get chat info
-        await client.get_chat(channel_id)
-        # Skip message history check as it causes BOT_METHOD_INVALID error
-        # Bot access to the channel is sufficient for File2Link functionality
-        return True
-
-    except Exception as e:
-        error_msg = str(e).lower()
-        if "invalid chat_id" in error_msg:
-            LOGGER.error(
-                f"Invalid chat_id {channel_id}. Please check FILE2LINK_BIN_CHANNEL configuration"
-            )
-        elif "chat not found" in error_msg:
-            LOGGER.error(
-                f"Storage channel {channel_id} not found. Please verify the channel exists"
-            )
-        elif "forbidden" in error_msg:
-            LOGGER.error(
-                f"Bot lacks access to storage channel {channel_id}. Please add bot to the channel with admin permissions"
-            )
-        else:
-            LOGGER.error(f"Error accessing storage channel {channel_id}: {e}")
-        return False
 
 
 SERVICES = {
@@ -378,42 +108,42 @@ SERVICES = {
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Initialize download clients
+    # Initialize clients
     app.state.aria2 = Aria2HttpClient("http://localhost:6800/jsonrpc")
     app.state.qbittorrent = await create_client("http://localhost:8090/api/v2/")
-    global aria2, qbittorrent
+
+    # For backward compatibility
+    global aria2, qbittorrent  # noqa: PLW0603
     aria2 = app.state.aria2
     qbittorrent = app.state.qbittorrent
 
-    # Initialize WebStreamer for File2Link
-    if Config.FILE2LINK_ENABLED:
-        app.state.web_streamer = await WebStreamer.get_instance()
-        if not app.state.web_streamer.bot:
-             LOGGER.error("File2Link streaming will not work as the client failed to start.")
-    else:
-        app.state.web_streamer = None
+    try:
+        # Import garbage collection utilities
+        from bot.helper.ext_utils.gc_utils import smart_garbage_collection
 
+        app.state.gc_utils = smart_garbage_collection
+    except ImportError:
+        app.state.gc_utils = None
     yield
 
     # Properly close all connections
-    LOGGER.info("Shutting down web server and closing connections...")
     try:
         await app.state.aria2.close()
-        LOGGER.info("Aria2 client connection closed.")
+        LOGGER.info("Aria2 client connection closed")
     except Exception as e:
         LOGGER.error(f"Error closing Aria2 client: {e}")
 
     try:
         await app.state.qbittorrent.close()
-        LOGGER.info("qBittorrent client connection closed.")
+        LOGGER.info("qBittorrent client connection closed")
     except Exception as e:
         LOGGER.error(f"Error closing qBittorrent client: {e}")
 
-    if app.state.web_streamer:
-        try:
-            await app.state.web_streamer.stop_clients()
-        except Exception as e:
-            LOGGER.error(f"Error stopping WebStreamer clients: {e}")
+    # Force garbage collection
+    if app.state.gc_utils:
+        app.state.gc_utils(
+            aggressive=True
+        )  # Use aggressive mode for cleanup on shutdown
 
 
 app = FastAPI(lifespan=lifespan)
@@ -770,6 +500,9 @@ async def homepage():
     )
 
 
-@app.get("/health")
-async def health_check():
-    return {"status": "ok", "message": "Aeon-MLTB web server is running."}
+@app.exception_handler(Exception)
+async def page_not_found(_, exc):
+    return HTMLResponse(
+        f"<h1>404: Task not found! Mostly wrong input. <br><br>Error: {exc}</h1>",
+        status_code=404,
+    )

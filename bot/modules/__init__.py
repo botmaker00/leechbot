@@ -28,7 +28,6 @@ from .encoding import (
 from .exec import aioexecute, clear, execute
 
 # File2Link module for streaming functionality
-from .file2link import file2link_command
 from .file_selector import confirm_selection, select
 from .font_styles import font_styles_cmd
 from .force_start import remove_from_queue
@@ -143,7 +142,6 @@ __all__ = [
     "encoding_callback",
     "encoding_help_command",
     "execute",
-    "file2link_command",
     "finish_pagination_callback",
     "font_styles_cmd",
     "force_delete_all_messages",

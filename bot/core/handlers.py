@@ -45,7 +45,6 @@ from bot.modules import (  # Encoding/Decoding imports; index_command removed - 
     encode_command,
     encoding_callback,
     execute,
-    file2link_command,
     finish_pagination_callback,
     font_styles_cmd,
     force_delete_all_messages,
@@ -577,6 +576,8 @@ def add_handlers():
         # Add MEGA search handlers to command_filters
         command_filters.update(mega_search_handlers)
 
+    # Add File2Link handler if enabled
+    if Config.FILE2LINK_ENABLED:
 
     # Add Phish Directory handler if enabled
     if Config.PHISH_DIRECTORY_ENABLED:
@@ -914,7 +915,6 @@ def add_handlers():
         "mgs",
         "quickinfo",
         "qi",
-        "file2link",
         "f2l",
         "tool",
         "t",
