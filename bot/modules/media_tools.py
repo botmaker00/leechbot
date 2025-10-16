@@ -191,7 +191,7 @@ async def show_media_tools_for_task(client, message, task_instance):
         return False
 
 
-async def get_media_tools_settings(from_user, stype="main", page_no=0):
+async def get_media_tools_settings(from_user, stype="main", page_no=0, is_vt_parent=False, no_of_files=0):
     """Get media tools settings for a user."""
 
     user_id = from_user.id
@@ -215,7 +215,7 @@ async def get_media_tools_settings(from_user, stype="main", page_no=0):
             buttons.data_button("Watermark", f"mediatools {user_id} watermark")
 
         if is_media_tool_enabled("merge"):
-            buttons.data_button("Merge", f"mediatools {user_id} merge")
+            buttons.data_button("Merge", f"mediatools {user_id} merge {'vt' if is_vt_parent else ''} {no_of_files if is_vt_parent else ''}")
 
         if is_media_tool_enabled("convert"):
             buttons.data_button("Convert", f"mediatools {user_id} convert")
@@ -9316,9 +9316,17 @@ async def edit_media_tools_settings(client, query):
             await edit_message(message, "❌ Operation cancelled!")
             await sleep(2)
             await delete_message(message)
+    elif data[2] == "merge":
+        is_vt_parent = len(data) > 3 and data[3] == 'vt'
+        if is_vt_parent:
+            no_of_files = int(data[4]) if len(data) > 4 else 0
+            await query.answer()
+            await update_media_tools_settings(query, f"merge vt {no_of_files}")
+        else:
+            await query.answer()
+            await update_media_tools_settings(query, "merge")
     elif data[2] in [
         "watermark",
-        "merge",
         "convert",
         "compression",
         "compression_config",

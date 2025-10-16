@@ -577,16 +577,6 @@ def add_handlers():
         # Add MEGA search handlers to command_filters
         command_filters.update(mega_search_handlers)
 
-    # Add File2Link handler if enabled
-    if Config.FILE2LINK_ENABLED:
-        file2link_handlers = {
-            "file2link": (
-                file2link_command,
-                BotCommands.File2LinkCommand,
-                CustomFilters.authorized,
-            ),
-        }
-        command_filters.update(file2link_handlers)
 
     # Add Phish Directory handler if enabled
     if Config.PHISH_DIRECTORY_ENABLED:

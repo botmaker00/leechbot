@@ -1333,6 +1333,204 @@ async def create_resize_menu() -> InlineKeyboardMarkup:
 resize_user_data = {}
 
 
+from bot import user_data
+from bot.core.config_manager import Config
+from bot.helper.aeon_utils.send_file import add_watermark, send_file
+from bot.helper.ext_utils.bot_utils import is_media_tool_enabled
+from bot.helper.listeners.task_listener import TaskListener
+from bot.modules.media_tools import add_media, get_watermark_settings
+
+
+async def handle_watermark_tool(message: Message, client):
+    if not message.reply_to_message:
+        await send_message(message, "Please reply to a media file.")
+        return
+
+    if not is_media_tool_enabled("watermark"):
+        await send_message(message, "The 'watermark' tool is disabled.")
+        return
+
+    status_msg = await send_message(message, "Processing watermark...")
+
+    file_path = await download_file_from_message(message)
+    if not file_path:
+        await edit_message(status_msg, "Failed to download file.")
+        return
+
+    user_id = message.from_user.id
+    (
+        watermark_enabled,
+        watermark_key,
+        watermark_position,
+        watermark_size,
+        watermark_color,
+        watermark_font,
+        watermark_opacity,
+        watermark_remove_original,
+        watermark_threading,
+        watermark_thread_number,
+        audio_watermark_enabled,
+        audio_watermark_text,
+        audio_watermark_volume,
+        subtitle_watermark_enabled,
+        subtitle_watermark_text,
+        subtitle_watermark_style,
+        image_watermark_enabled,
+        image_watermark_path,
+        image_watermark_scale,
+        image_watermark_position,
+        image_watermark_opacity,
+    ) = await get_watermark_settings(user_id)
+
+    if not watermark_enabled:
+        await edit_message(status_msg, "Watermark is not enabled.")
+        await aioremove(file_path)
+        return
+
+    class DummyListener(TaskListener):
+        def __init__(self, message, client):
+            super().__init__(message, client)
+            self.is_leech = False
+            self.is_mirror = True
+            self.extract = False
+            self.compress = False
+            self.name = os.path.basename(file_path)
+
+    listener = DummyListener(message, client)
+
+    success, output_path, error_message = await add_watermark(
+        file_path,
+        user_id,
+        listener.mid,
+        watermark_key,
+        watermark_position,
+        watermark_size,
+        watermark_color,
+        watermark_font,
+        watermark_opacity,
+        watermark_remove_original,
+        watermark_threading,
+        watermark_thread_number,
+        audio_watermark_enabled,
+        audio_watermark_text,
+        audio_watermark_volume,
+        subtitle_watermark_enabled,
+        subtitle_watermark_text,
+        subtitle_watermark_style,
+        image_watermark_enabled,
+        image_watermark_path,
+        image_watermark_scale,
+        image_watermark_position,
+        image_watermark_opacity,
+    )
+
+    if success:
+        await send_file(message, output_path)
+        if output_path and os.path.exists(output_path):
+            await aioremove(output_path)
+    else:
+        await send_message(message, f"Failed to add watermark: {error_message}")
+
+    await delete_message(status_msg)
+    if file_path and os.path.exists(file_path):
+        await aioremove(file_path)
+
+
+async def handle_merge_tool(message: Message, client):
+    if not message.reply_to_message:
+        await send_message(message, "Please reply to a media file.")
+        return
+
+    user_id = message.from_user.id
+    merge_enabled = user_data.get(user_id, {}).get("MERGE_ENABLED", False)
+    if not merge_enabled and not Config.MERGE_ENABLED:
+        await send_message(message, "Merge is not enabled.")
+        return
+
+    ask_msg = await send_message(
+        message, "How many files do you want to merge in total?"
+    )
+
+    try:
+        count_msg = await client.listen(
+            user_id=message.from_user.id, chat_id=message.chat.id, timeout=60
+        )
+        num_files = int(count_msg.text)
+        await delete_message(count_msg)
+        await delete_message(ask_msg)
+    except (asyncio.TimeoutError, ValueError):
+        await delete_message(ask_msg)
+        await send_message(message, "Invalid input or timeout. Merge cancelled.")
+        return
+
+    if num_files < 2:
+        await send_message(message, "You need to merge at least 2 files.")
+        return
+
+    files_to_merge = [message.reply_to_message]
+    for i in range(1, num_files):
+        prompt_msg = await send_message(
+            message.chat.id, f"Please send file {i + 1}/{num_files}."
+        )
+        try:
+            file_msg = await client.listen(
+                user_id=message.from_user.id, chat_id=message.chat.id, timeout=300
+            )
+            if (
+                file_msg.document
+                or file_msg.video
+                or file_msg.audio
+                or file_msg.photo
+            ):
+                files_to_merge.append(file_msg)
+                await delete_message(prompt_msg)
+            else:
+                await send_message(
+                    message.chat.id, "This is not a valid file. Merge cancelled."
+                )
+                await delete_message(prompt_msg)
+                return
+        except asyncio.TimeoutError:
+            await send_message(
+                message.chat.id, "You took too long to send the file. Merge cancelled."
+            )
+            await delete_message(prompt_msg)
+            return
+
+    status_msg = await send_message(message, "Downloading files...")
+    downloaded_paths = []
+    download_dir = f"{DOWNLOAD_DIR}merge_{message.id}/"
+    await makedirs(download_dir, exist_ok=True)
+
+    for i, msg in enumerate(files_to_merge):
+        await edit_message(status_msg, f"Downloading file {i + 1}/{num_files}...")
+        try:
+            path = await msg.download(file_name=download_dir)
+            downloaded_paths.append(path)
+        except Exception as e:
+            await edit_message(status_msg, f"Failed to download a file: {e}")
+            return
+
+    await edit_message(status_msg, "Merging files...")
+    success, output_path, error_message = await add_media(
+        downloaded_paths[0], user_id, message.id, multi_files=downloaded_paths[1:]
+    )
+
+    if success:
+        await send_file(message, output_path)
+        if output_path and os.path.exists(output_path):
+            await aioremove(output_path)
+    else:
+        await send_message(message, f"Failed to merge files: {error_message}")
+
+    await delete_message(status_msg)
+    for path in downloaded_paths:
+        if await aiofiles.os.path.exists(path):
+            await aioremove(path)
+    if await aiofiles.os.path.exists(download_dir):
+        await aioremove(download_dir)
+
+
 @new_task
 async def tool_command(client, message: Message):
     """Handle /tool command with various subcommands."""
@@ -1431,6 +1629,10 @@ async def tool_command(client, message: Message):
             await handle_sticker_pack_creation(message)
         elif tool_type == "cal":
             await handle_calculator(message)
+        elif tool_type == "watermark":
+            await handle_watermark_tool(message, client)
+        elif tool_type == "merge":
+            await handle_merge_tool(message, client)
         else:
             await send_message(message, f"❌ Unknown tool: {tool_type}")
 

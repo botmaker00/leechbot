@@ -138,6 +138,7 @@ class Mirror(TaskListener):
             "-bt": False,
             "-ut": False,
             "-mt": False,
+            "-vt": False,
             "-merge-video": False,
             "-merge-audio": False,
             "-merge-subtitle": False,
@@ -444,6 +445,12 @@ class Mirror(TaskListener):
         self.as_doc = args["-doc"]
         self.as_med = args["-med"]
         self.media_tools = args["-mt"]
+        self.video_tools = args["-vt"]
+        if self.video_tools:
+            from bot.modules.tool_commands import handle_merge_tool
+
+            bot_loop.create_task(handle_merge_tool(self.message, self.client))
+            return
 
         # Register user as pending task user if -mt flag is used
         if self.media_tools:
@@ -966,10 +973,10 @@ class Mirror(TaskListener):
         # Mega links are now supported natively, no need to force JDownloader
 
         # Check if media tools flag is set
-        if self.media_tools:
+        if self.media_tools or self.video_tools:
             # Show media tools settings and wait for user to click Done or timeout
             proceed = await show_media_tools_for_task(
-                self.client, self.message, self
+                self.client, self.message, self, is_vt_parent=self.video_tools
             )
             if not proceed:
                 # User cancelled or timeout occurred

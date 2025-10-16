@@ -112,7 +112,6 @@ COMMANDS = {
     "NSFWTestCommand": "- Test NSFW detection on images",
     # QuickInfo Commands
     "QuickInfoCommand": "- Get chat/user information with interactive buttons",
-    "File2LinkCommand": "- Convert Telegram media files into direct streaming links",
     "ToolCommand": "- Media conversion and processing tools (gif, sticker, emoji, voice, etc.)",
     # IndexCommand removed - media indexing functionality disabled
     "BotSetCommand": "- [ADMIN] Open Bot settings",
