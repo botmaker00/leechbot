@@ -386,6 +386,8 @@ class Mirror(TaskListener):
 
         if self.compress and is_flag_enabled("-z"):
             self.compression_enabled = True
+        else:
+            self.compression_enabled = False
         self.extract = args["-e"]
         # Enable extract_enabled if -e flag is set and archive flags are enabled
         if self.extract and is_flag_enabled("-e"):

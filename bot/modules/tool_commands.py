@@ -12,7 +12,7 @@ from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message
 
 from bot import DOWNLOAD_DIR, LOGGER
 from bot.core.aeon_client import TgClient
-from bot.helper.ext_utils.aiofiles_compat import makedirs
+from bot.helper.ext_utils.aiofiles_compat import aiopath, makedirs
 from bot.helper.ext_utils.aiofiles_compat import remove as aioremove
 from bot.helper.ext_utils.bot_utils import new_task
 from bot.helper.ext_utils.media_utils import get_media_info
@@ -1525,9 +1525,9 @@ async def handle_merge_tool(message: Message, client):
 
     await delete_message(status_msg)
     for path in downloaded_paths:
-        if await aiofiles.os.path.exists(path):
+        if await aiopath.exists(path):
             await aioremove(path)
-    if await aiofiles.os.path.exists(download_dir):
+    if await aiopath.exists(download_dir):
         await aioremove(download_dir)
 
 
