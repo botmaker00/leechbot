@@ -128,37 +128,6 @@ class DecoratorWrapper:
         return getattr(self.client, name)
 
 
-async def save_session_string(session_name, session_string):
-    """Saves session string to a shared JSON file"""
-    import json
-    import os
-    import tempfile
-
-    config_file_path = os.path.join(
-        tempfile.gettempdir(), "aimleechbot_shared_config.json"
-    )
-    try:
-        # Load existing config if it exists
-        if os.path.exists(config_file_path):
-            with open(config_file_path) as f:
-                shared_config = json.load(f)
-        else:
-            shared_config = {}
-
-        # Update session string
-        if "sessions" not in shared_config:
-            shared_config["sessions"] = {}
-        shared_config["sessions"][session_name] = session_string
-
-        # Write back to file
-        with open(config_file_path, "w") as f:
-            json.dump(shared_config, f, indent=4)
-        LOGGER.info(f"Saved session string for '{session_name}'")
-
-    except Exception as e:
-        LOGGER.error(f"Failed to save session string for '{session_name}': {e}")
-
-
 class TgClient:
     _lock = Lock()
     _hlock = Lock()
@@ -197,10 +166,6 @@ class TgClient:
         try:
             await cls.bot.start()
             cls.NAME = cls.bot.me.username
-
-            # Save main bot session string
-            session_string = await cls.bot.export_session_string()
-            await save_session_string(f"web_main_{cls.ID}", session_string)
 
             # Add decorator wrapper for cross-library compatibility after successful start
             if not hasattr(cls.bot, "on_message") or IS_NEKOZEE:
@@ -293,11 +258,6 @@ class TgClient:
             hbot = Client(**helper_args)
             await hbot.start()
             LOGGER.info(f"Helper Bot [@{hbot.me.username}] Started!")
-
-            # Save helper bot session string
-            session_string = await hbot.export_session_string()
-            await save_session_string(f"web_helper{no}", session_string)
-
             cls.helper_bots[no], cls.helper_loads[no] = hbot, 0
         except Exception as e:
             LOGGER.error(f"Failed to start helper bot {no} from HELPER_TOKENS. {e}")

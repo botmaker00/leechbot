@@ -6,9 +6,6 @@ from asyncio import sleep
 from contextlib import asynccontextmanager
 from logging import INFO, WARNING, FileHandler, StreamHandler, basicConfig, getLogger
 from urllib.parse import urlparse
-import json
-import os
-import tempfile
 
 from aioaria2 import Aria2HttpClient  # type: ignore
 from aiohttp import ClientSession
@@ -227,60 +224,38 @@ async def init_streaming_client(TgClient):
     try:
         # Initialize main bot client if not already initialized
         if TgClient.bot is None:
-            import inspect
-
             from pyrogram import Client, enums
+            # Import library detection flag from aeon_client
+            from bot.core.aeon_client import USING_KURIGRAM
+            import os
 
-            # Create main bot client with better session management
+            # Create a dedicated session directory for the web server
+            web_session_dir = "/usr/src/app/web_sessions"
+            os.makedirs(web_session_dir, exist_ok=True)
+
             TgClient.ID = Config.BOT_TOKEN.split(":", 1)[0]
 
-            # Load session string from shared config
-            session_string = None
-            config_file_path = os.path.join(
-                tempfile.gettempdir(), "aimleechbot_shared_config.json"
-            )
-            if os.path.exists(config_file_path):
-                with open(config_file_path) as f:
-                    shared_config = json.load(f)
-                    session_string = shared_config.get("sessions", {}).get(
-                        f"web_main_{TgClient.ID}"
-                    )
-
-            if not session_string:
-                LOGGER.error(
-                    f"Session string for main bot (web_main_{TgClient.ID}) not found. Streaming will fail."
-                )
-                return
-
-            # Check if max_concurrent_transmissions is supported (kurigram vs pyrofork compatibility)
-            client_params = list(
-                inspect.signature(Client.__init__).parameters.keys()
-            )
             client_args = {
                 "name": f"web_main_{TgClient.ID}",
                 "api_id": Config.TELEGRAM_API,
                 "api_hash": Config.TELEGRAM_HASH,
                 "proxy": Config.TG_PROXY,
-                "session_string": session_string,
+                "bot_token": Config.BOT_TOKEN,
+                "workdir": web_session_dir,
                 "parse_mode": enums.ParseMode.HTML,
                 "no_updates": True,
             }
 
-            # Add kurigram-specific parameters if supported
-            if "max_concurrent_transmissions" in client_params:
+            if USING_KURIGRAM:
                 client_args["max_concurrent_transmissions"] = 100
 
             TgClient.bot = Client(**client_args)
-
-            # Start the main bot client
             await TgClient.bot.start()
             TgClient.NAME = TgClient.bot.me.username
 
         # Initialize helper bots for streaming if HELPER_TOKENS is available
         if Config.HELPER_TOKENS and not TgClient.helper_bots:
             await init_helper_bots_for_streaming(TgClient)
-            if hasattr(TgClient, "helper_bots") and TgClient.helper_bots:
-                pass
 
     except Exception as e:
         LOGGER.error(f"Failed to initialize streaming clients: {e}")
@@ -291,80 +266,50 @@ async def init_helper_bots_for_streaming(TgClient):
     """Initialize helper bots specifically for web server streaming"""
     try:
         from asyncio import gather
-
         from pyrogram import Client, enums
+        from bot.core.aeon_client import USING_KURIGRAM
+        import os
 
-        # Initialize helper bot containers if not present
+        web_session_dir = "/usr/src/app/web_sessions"
+        os.makedirs(web_session_dir, exist_ok=True)
+
         if not hasattr(TgClient, "helper_bots"):
             TgClient.helper_bots = {}
         if not hasattr(TgClient, "helper_loads"):
             TgClient.helper_loads = {}
 
-        # Load helper session strings from shared config
-        config_file_path = os.path.join(
-            tempfile.gettempdir(), "aimleechbot_shared_config.json"
-        )
-        if os.path.exists(config_file_path):
-            with open(config_file_path) as f:
-                shared_config = json.load(f)
-            helper_sessions = shared_config.get("sessions", {})
-        else:
-            helper_sessions = {}
-
         async def start_helper_bot(no, b_token):
             try:
-                session_name = f"web_helper{no}"
-                session_string = helper_sessions.get(session_name)
-                if not session_string:
-                    LOGGER.error(
-                        f"Session string for helper bot {session_name} not found. This helper will not be available."
-                    )
-                    return
-
-                # Check if max_concurrent_transmissions is supported (kurigram vs pyrofork compatibility)
-                import inspect
-
-                client_params = list(
-                    inspect.signature(Client.__init__).parameters.keys()
-                )
                 helper_args = {
-                    "name": session_name,
+                    "name": f"web_helper{no}",
                     "api_id": Config.TELEGRAM_API,
                     "api_hash": Config.TELEGRAM_HASH,
                     "proxy": Config.TG_PROXY,
-                    "session_string": session_string,
+                    "bot_token": b_token,
+                    "workdir": web_session_dir,
                     "parse_mode": enums.ParseMode.HTML,
                     "no_updates": True,
                 }
-
-                # Add kurigram-specific parameters if supported
-                if "max_concurrent_transmissions" in client_params:
+                if USING_KURIGRAM:
                     helper_args["max_concurrent_transmissions"] = 20
 
                 hbot = Client(**helper_args)
                 await hbot.start()
                 TgClient.helper_bots[no] = hbot
                 TgClient.helper_loads[no] = 0
-
             except Exception as e:
                 LOGGER.error(f"Failed to start helper bot {no} for streaming: {e}")
                 TgClient.helper_bots.pop(no, None)
                 TgClient.helper_loads.pop(no, None)
 
-        # Start all helper bots concurrently
         await gather(
             *(
                 start_helper_bot(no, b_token)
                 for no, b_token in enumerate(Config.HELPER_TOKENS.split(), start=1)
             )
         )
-
-        if not TgClient.helper_bots:
-            pass
-
     except Exception as e:
         LOGGER.error(f"Error initializing helper bots for streaming: {e}")
-        # Ensure containers exist even if initialization fails
         if not hasattr(TgClient, "helper_bots"):
             TgClient.helper_bots = {}
         if not hasattr(TgClient, "helper_loads"):
