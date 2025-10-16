@@ -744,48 +744,76 @@ class TelegramUploader:
             await self._copy_media_group(msgs_list)
 
     async def _send_media_group(self, subkey, key, msgs):
-        msgs_list = []
-        for msg_data in msgs:
-            try:
-                if self._listener.hybrid_leech or not self._user_session:
-                    msg = await self._listener.client.get_messages(
-                        chat_id=msg_data[0], message_ids=msg_data[1]
-                    )
-                else:
-                    msg = await TgClient.user.get_messages(
-                        chat_id=msg_data[0], message_ids=msg_data[1]
-                    )
-                msgs_list.append(msg)
-            except Exception as e:
-                LOGGER.error(f"Failed to get message for media group: {e}")
-        if not msgs_list:
-            return
+        # Get message objects from chat_id and message_id pairs
+        for index, msg in enumerate(msgs):
+            if self._listener.hybrid_leech or not self._user_session:
+                msgs[index] = await self._listener.client.get_messages(
+                    chat_id=msg[0], message_ids=msg[1]
+                )
+            else:
+                msgs[index] = await TgClient.user.get_messages(
+                    chat_id=msg[0], message_ids=msg[1]
+                )
 
-        reply_to_message = msgs_list[0].reply_to_message
+        # Get the original message to reply to
+        reply_to_message = msgs[0].reply_to_message
+
+        # Create InputMedia objects
         input_media = self._get_input_media(subkey, key)
-        if not input_media:
-            return
 
-        target_chat_id = (
-            reply_to_message.chat.id if reply_to_message else msgs_list[0].chat.id
-        )
-        reply_to_message_id = reply_to_message.id if reply_to_message else None
+        # Determine the target chat and reply message ID
+        if reply_to_message:
+            # If there's a reply_to_message, use its chat and reply to it
+            if (
+                not hasattr(reply_to_message, "chat")
+                or reply_to_message.chat is None
+            ):
+                LOGGER.error(
+                    "Cannot send media group: reply_to_message has no chat attribute or chat is None"
+                )
+                return
+            if not hasattr(reply_to_message.chat, "id") or not hasattr(
+                reply_to_message, "id"
+            ):
+                LOGGER.error(
+                    "Cannot send media group: reply_to_message.chat or reply_to_message has no id attribute"
+                )
+                return
+            target_chat_id = reply_to_message.chat.id
+            reply_to_message_id = reply_to_message.id
+        else:
+            # If no reply_to_message, use the original message's chat
+            if not msgs or len(msgs) == 0:
+                LOGGER.error("Cannot send media group: msgs list is empty")
+                return
+            if not hasattr(msgs[0], "chat") or msgs[0].chat is None:
+                LOGGER.error(
+                    "Cannot send media group: msgs[0] has no chat attribute or chat is None"
+                )
+                return
+            if not hasattr(msgs[0].chat, "id"):
+                LOGGER.error(
+                    "Cannot send media group: msgs[0].chat has no id attribute"
+                )
+                return
+            target_chat_id = msgs[0].chat.id
+            reply_to_message_id = None
 
-        client = (
-            self._listener.client
-            if self._listener.hybrid_leech or not self._user_session
-            else TgClient.user
-        )
-        try:
-            msgs_list = await client.send_media_group(
+        # Send media group using direct client method (bypassing kurigram's buggy reply_media_group)
+        if self._listener.hybrid_leech or not self._user_session:
+            msgs_list = await self._listener.client.send_media_group(
                 chat_id=target_chat_id,
                 media=input_media,
                 reply_to_message_id=reply_to_message_id,
                 disable_notification=True,
             )
-        except Exception as e:
-            LOGGER.error(f"Failed to send media group: {e}")
-            return
+        else:
+            msgs_list = await TgClient.user.send_media_group(
+                chat_id=target_chat_id,
+                media=input_media,
+                reply_to_message_id=reply_to_message_id,
+                disable_notification=True,
+            )
 
         # Log successful media group creation
         LOGGER.info(

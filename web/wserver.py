@@ -231,11 +231,6 @@ async def init_streaming_client(TgClient):
             # Create main bot client with better session management
             TgClient.ID = Config.BOT_TOKEN.split(":", 1)[0]
 
-            # Use in-memory session for web server to avoid file conflicts and auth issues
-            import tempfile
-
-            session_dir = tempfile.mkdtemp(prefix="web_sessions_")
-
             # Check if max_concurrent_transmissions is supported (kurigram vs pyrofork compatibility)
             client_params = list(
                 inspect.signature(Client.__init__).parameters.keys()
@@ -246,10 +241,9 @@ async def init_streaming_client(TgClient):
                 "api_hash": Config.TELEGRAM_HASH,
                 "proxy": Config.TG_PROXY,
                 "bot_token": Config.BOT_TOKEN,
-                "workdir": session_dir,  # Use temporary directory for sessions
                 "parse_mode": enums.ParseMode.HTML,
                 "no_updates": True,  # Disable updates for web server client
-                "in_memory": True,  # Use in-memory session to avoid auth issues
+                "in_memory": True,
             }
 
             # Add kurigram-specific parameters if supported
@@ -288,13 +282,9 @@ async def init_helper_bots_for_streaming(TgClient):
 
         async def start_helper_bot(no, b_token):
             try:
-                # Use in-memory session for helper bots to avoid auth issues
-                import inspect
-                import tempfile
-
-                session_dir = tempfile.mkdtemp(prefix=f"web_helper{no}_")
-
                 # Check if max_concurrent_transmissions is supported (kurigram vs pyrofork compatibility)
+                import inspect
+
                 client_params = list(
                     inspect.signature(Client.__init__).parameters.keys()
                 )
@@ -304,10 +294,9 @@ async def init_helper_bots_for_streaming(TgClient):
                     "api_hash": Config.TELEGRAM_HASH,
                     "proxy": Config.TG_PROXY,
                     "bot_token": b_token,
-                    "workdir": session_dir,  # Use temporary directory for sessions
                     "parse_mode": enums.ParseMode.HTML,
                     "no_updates": True,
-                    "in_memory": True,  # Use in-memory session to avoid auth issues
+                    "in_memory": True,
                 }
 
                 # Add kurigram-specific parameters if supported
